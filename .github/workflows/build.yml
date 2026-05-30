@@ -1,26 +1,37 @@
-name: Build Athena OpenWrt Firmware
+name: 编译京东云雅典娜固件
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:           # 允许手动触发
-  schedule:
-    - cron: '0 2 * * 0'        # 每周日凌晨2点自动编译
+  workflow_dispatch:           # 仅允许手动触发
+    inputs:
+      clean_build:
+        description: '是否清理后重新编译'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
+      skip_download:
+        description: '跳过依赖下载（使用缓存）'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
 
 jobs:
-  build-athena:
+  编译固件:
     runs-on: ubuntu-22.04
     timeout-minutes: 180       # 3小时超时
     
     steps:
-    - name: Checkout repository
+    - name: 检出代码
       uses: actions/checkout@v3
       with:
         submodules: recursive
     
-    - name: Setup environment
+    - name: 设置编译环境
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential ccache ecj fastjar file g++ gawk \
@@ -28,44 +39,55 @@ jobs:
           libncursesw5-dev libssl-dev python3 python3-distutils python3-setuptools \
           python3-pip rsync subversion swig time xsltproc zlib1g-dev
     
-    - name: Clone LEDE source
+    - name: 克隆LEDE源码
       run: |
         git clone https://github.com/coolsnowwolf/lede.git openwrt
         cd openwrt
         git checkout master
     
-    - name: Configure for Athena
+    - name: 配置京东云雅典娜
       run: |
         cd openwrt
         # 应用京东云雅典娜配置
         cp ../athena.config .config
         
-        # 更新feeds
+        # 设置软件源
         echo "src-git packages https://github.com/coolsnowwolf/packages" > feeds.conf.default
         echo "src-git luci https://github.com/coolsnowwolf/luci" >> feeds.conf.default
         echo "src-git routing https://git.openwrt.org/feed/routing.git" >> feeds.conf.default
         echo "src-git telephony https://git.openwrt.org/feed/telephony.git" >> feeds.conf.default
         
+        # 更新软件源
         ./scripts/feeds update -a
         ./scripts/feeds install -a
         
         # 应用配置
         make defconfig
     
-    - name: Download dependencies
+    - name: 下载编译依赖
+      if: ${{ github.event.inputs.skip_download != 'true' }}
       run: |
         cd openwrt
         make -j$(nproc) download 2>&1 | tee download.log
     
-    - name: Build firmware
+    - name: 开始编译固件
       run: |
         cd openwrt
         echo "开始编译京东云雅典娜固件..."
+        
+        # 如果选择清理编译
+        if [ "${{ github.event.inputs.clean_build }}" = "true" ]; then
+          echo "清理之前的编译文件..."
+          make clean
+        fi
+        
+        # 开始编译
         make -j$(($(nproc) + 1)) V=s 2>&1 | tee build.log
         
         # 检查编译结果
         if [ -f "bin/targets/ipq60xx/generic/openwrt-ipq60xx-generic-jdcloud_re-cs-02-squashfs-sysupgrade.bin" ]; then
           echo "编译成功！"
+          echo "生成的固件："
           ls -la bin/targets/ipq60xx/generic/*.bin
         else
           echo "编译失败！"
@@ -73,19 +95,26 @@ jobs:
           exit 1
         fi
     
-    - name: Upload firmware artifact
+    - name: 上传固件文件
       uses: actions/upload-artifact@v3
       with:
-        name: athena-firmware
+        name: 雅典娜固件
         path: openwrt/bin/targets/ipq60xx/generic/
         retention-days: 7
     
-    - name: Upload build logs
+    - name: 上传编译日志
       if: always()
       uses: actions/upload-artifact@v3
       with:
-        name: build-logs
+        name: 编译日志
         path: |
           openwrt/build.log
           openwrt/download.log
         retention-days: 7
+    
+    - name: 显示编译信息
+      if: success()
+      run: |
+        echo "编译完成！"
+        echo "固件文件可在Artifacts中的'雅典娜固件'中下载"
+        echo "编译日志可在Artifacts中的'编译日志'中查看"
