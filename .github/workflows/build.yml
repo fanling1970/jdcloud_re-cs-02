@@ -9,19 +9,20 @@ on:
         default: 'false'
         type: choice
         options:
-        - 'true'
-        - 'false'
+          - 'true'
+          - 'false'
       skip_download:
         description: '跳过依赖下载（使用缓存）'
         required: false
         default: 'false'
         type: choice
         options:
-        - 'true'
-        - 'false'
+          - 'true'
+          - 'false'
 
 jobs:
-  编译固件:
+  build-firmware:              # Job ID必须用英文
+    name: 编译固件             # 显示名称可以是中文
     runs-on: ubuntu-22.04
     timeout-minutes: 180       # 3小时超时
     
