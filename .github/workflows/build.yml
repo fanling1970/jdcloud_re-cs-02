@@ -2,9 +2,9 @@ name: Build Athena OpenWrt Firmware
 
 于:
   push:
-    分支: [ main ]
+    branches: [ main ]
   pull_request:
-    分支: [ main ]
+    branches: [ main ]
   workflow_dispatch:           # 允许手动触发
   schedule:
     - cron: '0 2 * * 0'        # 每周日凌晨2点自动编译
