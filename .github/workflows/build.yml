@@ -66,7 +66,7 @@ jobs:
         make defconfig
     
     - name: 下载编译依赖
-      if: $
+      if: ${{ inputs.skip_download != 'true' }}
       run: |
         cd openwrt
         make -j$(nproc) download 2>&1 | tee download.log
@@ -77,7 +77,7 @@ jobs:
         echo "开始编译京东云雅典娜固件..."
         
         # 如果选择清理编译
-        if [ "$" = "true" ]; then
+        if [ "${{ inputs.clean_build }}" = "true" ]; then
           echo "清理之前的编译文件..."
           make clean
         fi
