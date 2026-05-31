@@ -142,11 +142,11 @@ git clone --depth=1 -b main https://github.com/xiaorouji/openwrt-passwall-packag
 # git clone --depth=1 https://github.com/sbwml/luci-app-openlist2.git package/luci-app-openlist2
 
 # filemanager（ 文件管理 ）
-git clone --depth=1 https://github.com/sbwml/luci-app-filemanager package/luci-app-filemanager
+# git clone --depth=1 https://github.com/sbwml/luci-app-filemanager package/luci-app-filemanager
 # git clone --depth=1 https://github.com/muink/luci-app-tinyfilemanager package/luci-app-tinyfilemanager
 
 # jdCloud ax6600 led screen ctrl
-git clone --depth=1 https://github.com/NONGFAH/luci-app-athena-led package/luci-app-athena-led
+# git clone --depth=1 https://github.com/NONGFAH/luci-app-athena-led package/luci-app-athena-led
 
 ./scripts/feeds update -a
 ./scripts/feeds install -a
