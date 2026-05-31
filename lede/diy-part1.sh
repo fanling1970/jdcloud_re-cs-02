@@ -1,15 +1,17 @@
 #!/bin/bash
+
 echo "🔧 DIY Part 1: 编译前自定义操作"
-echo "执行时间: $(date)"
-echo "工作目录: $(pwd)"
+echo "执行时间：$(date)"
 
-# 1. 添加通用补丁（如果有）
-# patch -p1 < ../patches/some-patch.patch
+# 1. 检查固件文件
+if [ -d "bin/targets/qualcommax/ipq60xx" ]; then
+  echo "找到固件文件"
+  ls -lh bin/targets/qualcommax/ipq60xx/*.bin 2>/dev/null || true
+fi
 
-# 2. 修改通用配置
-# sed -i 's/old_value/new_value/g' some-file
+# 2. 克隆 mosdns（LEDE源码不自带）
+echo "添加 mosdns 插件..."
+rm -rf package/luci-app-mosdns
+git clone --depth=1 https://github.com/sbwml/luci-app-mosdns.git package/luci-app-mosdns
 
-# 3. 添加自定义软件包
-# cp -r ../custom-packages/* package/
-
-echo "✅ DIY Part 1完成"
+echo "✅ DIY Part 1 完成"
