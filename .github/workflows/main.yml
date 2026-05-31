@@ -1,0 +1,38 @@
+name: 测试配置文件修复
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        
+      - name: 验证配置文件修复
+        run: |
+          echo "=== 配置文件修复验证 ==="
+          echo ""
+          
+          echo "1. ✅ 检查x86禁用:"
+          grep "# CONFIG_TARGET_x86 is not set" lede/ax6600.config && echo "   ✅ x86已禁用" || echo "   ❌ x86未禁用"
+          
+          echo ""
+          echo "2. ✅ 检查x86_64禁用:"
+          grep "# CONFIG_TARGET_x86_64 is not set" lede/ax6600.config && echo "   ✅ x86_64已禁用" || echo "   ❌ x86_64未禁用"
+          
+          echo ""
+          echo "3. ✅ 检查qualcommax启用:"
+          grep "CONFIG_TARGET_qualcommax=y" lede/ax6600.config && echo "   ✅ qualcommax已启用" || echo "   ❌ qualcommax未启用"
+          
+          echo ""
+          echo "4. ✅ 检查目标设备:"
+          grep "CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_jdcloud_re-cs-02=y" lede/ax6600.config && echo "   ✅ JDCloud RE-CS-02设备已启用" || echo "   ❌ 设备未启用"
+          
+          echo ""
+          echo "5. ✅ 检查目标架构:"
+          grep 'CONFIG_TARGET_BOARD="qualcommax"' lede/ax6600.config && echo "   ✅ 目标板: qualcommax" || echo "   ❌ 目标板错误"
+          grep 'CONFIG_TARGET_ARCH_PACKAGES="aarch64_cortex-a53"' lede/ax6600.config && echo "   ✅ 架构包: aarch64_cortex-a53" || echo "   ❌ 架构包错误"
+          
+          echo ""
+          echo "=== 配置文件前50行预览 ==="
+          head -50 lede/ax6600.config
