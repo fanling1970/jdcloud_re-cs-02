@@ -1,4 +1,4 @@
-name: LEDE编译终极版
+name: LEDE编译终极版（含DIY）
 
 on:
   workflow_dispatch:
@@ -10,34 +10,38 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: 更新feeds配置（可选）
+    - name: 检查DIY脚本
       run: |
-        echo "🔄 更新feeds配置为最新分支..."
-        # 如果feeds.conf.default存在且需要更新
-        if [ -f "lede/feeds.conf.default" ]; then
-          # 备份原文件
-          cp lede/feeds.conf.default lede/feeds.conf.default.backup
-          # 更新luci分支为master
-          sed -i 's|;openwrt-23.05|;master|g' lede/feeds.conf.default
-          echo "✅ feeds配置已更新"
-          echo "新配置:"
-          cat lede/feeds.conf.default
-        fi
+        echo "🔍 检查DIY脚本..."
+        for script in lede/diy-part1.sh lede/diy-part2.sh; do
+          if [ -f "$script" ]; then
+            echo "✅ 找到: $script"
+            echo "大小: $(wc -l < "$script") 行"
+            echo "内容预览:"
+            head -10 "$script"
+            echo ""
+            # 确保有执行权限
+            chmod +x "$script" 2>/dev/null || true
+          else
+            echo "ℹ️ 未找到: $script"
+          fi
+        done
     
     - name: 克隆LEDE源码
       run: git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede-src
     
-    - name: 复制feeds配置
+    - name: 执行DIY Part 1（如果存在）
       run: |
-        cd lede-src
-        if [ -f "../lede/feeds.conf.default" ]; then
-          cp ../lede/feeds.conf.default feeds.conf.default
-          echo "✅ 已复制feeds配置"
+        if [ -f "lede/diy-part1.sh" ] && [ -s "lede/diy-part1.sh" ]; then
+          echo "🔧 执行DIY Part 1..."
+          cd lede-src
+          chmod +x ../lede/diy-part1.sh
+          ../lede/diy-part1.sh
         else
-          echo "ℹ️ 使用LEDE默认feeds配置"
+          echo "ℹ️ 跳过DIY Part 1（文件不存在或为空）"
         fi
     
-    - name: 应用固件配置
+    - name: 应用配置
       run: |
         cd lede-src
         if [ -f "../lede/ax6600-smart.config" ]; then
@@ -64,12 +68,24 @@ jobs:
           make -j1 V=s 2>&1 | tee -a build.log
         }
     
+    - name: 执行DIY Part 2（如果存在）
+      run: |
+        if [ -f "lede/diy-part2.sh" ] && [ -s "lede/diy-part2.sh" ]; then
+          echo "🔧 执行DIY Part 2..."
+          cd lede-src
+          chmod +x ../lede/diy-part2.sh
+          ../lede/diy-part2.sh
+        else
+          echo "ℹ️ 跳过DIY Part 2（文件不存在或为空）"
+        fi
+    
     - name: 验证结果
       run: |
         cd lede-src
         if [ -d "bin/targets/qualcommax/ipq60xx" ]; then
           echo "🎉 编译成功！"
-          ls -la bin/targets/qualcommax/ipq60xx/*.bin 2>/dev/null || true
+          echo "固件文件:"
+          find bin/targets/qualcommax/ipq60xx -name "*.bin" -o -name "*.img" | head -5
         else
           echo "❌ 编译失败"
           exit 1
@@ -78,5 +94,5 @@ jobs:
     - name: 上传固件
       uses: actions/upload-artifact@v4
       with:
-        name: firmware-ultimate
+        name: firmware-with-diy
         path: lede-src/bin/targets/
