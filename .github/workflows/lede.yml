@@ -1,4 +1,4 @@
-#
+# ====================================================================
 # https://github.com/P3TERX/Actions-OpenWrt
 #
 # File: .github/workflows/openwrt-builder.yml
@@ -8,6 +8,7 @@
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
+# ====================================================================
 
 name: LEDE固件编译（最精简版）
 
@@ -18,7 +19,7 @@ env:
   REPO_URL: https://github.com/coolsnowwolf/lede.git
   REPO_BRANCH: master
   FEEDS_CONF: lede/feeds.conf.default
-  CONFIG_FILE: lede/ax6600.config  # 重要：改为ax6600.config
+  CONFIG_FILE: lede/ax6600.config # 重要：改为ax6600.config
   DIY_P1_SH: lede/diy-part1.sh
   DIY_P2_SH: lede/diy-part2.sh
   UPLOAD_BIN_DIR: false
@@ -34,15 +35,15 @@ jobs:
         run: |
           echo "编译前磁盘空间:"
           df -h
-      
+          
       - name: 快速磁盘清理
         run: |
           sudo apt-get clean 2>/dev/null || true
           sudo rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
-      
+          
       - name: 检出代码仓库
         uses: actions/checkout@v4
-      
+        
       - name: 验证源文件
         run: |
           echo "📁 检查lede目录内容:"
@@ -52,8 +53,8 @@ jobs:
           [ -f lede/ax6600.config ] && echo "✅ ax6600.config存在" || echo "❌ ax6600.config不存在"
           echo ""
           echo "🔍 检查目标设备配置:"
-          grep -i "jdcloud" lede/ax6600.config || echo "未找到jdcloud配置"
-      
+          grep -i "jdcloud\|ipq60xx\|qualcommax" lede/ax6600.config || echo "未找到目标设备配置"
+          
       - name: 初始化编译环境（最精简版）
         timeout-minutes: 8
         env:
@@ -87,12 +88,12 @@ jobs:
           sudo timedatectl set-timezone "$TZ"
           
           echo "✅ 初始化完成！"
-      
+          
       - name: 克隆LEDE源代码
         run: |
           echo "📥 克隆LEDE源代码..."
           git clone --depth=1 $REPO_URL -b $REPO_BRANCH openwrt
-      
+          
       - name: 加载配置（关键步骤）
         run: |
           echo "🔧 加载配置文件..."
@@ -118,8 +119,8 @@ jobs:
           chmod +x "$DIY_P1_SH" "$DIY_P2_SH" 2>/dev/null || true
           
           echo "📋 验证.config文件内容:"
-          head -10 openwrt/.config
-      
+          head -20 openwrt/.config
+          
       - name: 更新和安装软件源
         run: |
           cd openwrt
@@ -132,45 +133,77 @@ jobs:
           echo "⚙️ 执行自定义脚本..."
           [ -f "$GITHUB_WORKSPACE/$DIY_P1_SH" ] && "$GITHUB_WORKSPACE/$DIY_P1_SH" || echo "diy-part1.sh跳过"
           [ -f "$GITHUB_WORKSPACE/$DIY_P2_SH" ] && "$GITHUB_WORKSPACE/$DIY_P2_SH" || echo "diy-part2.sh跳过"
-      
-      - name: 验证目标配置
+          
+      - name: 验证目标配置（改进版）
         run: |
           cd openwrt
           echo "🎯 验证目标设备配置..."
+          echo "=========================================="
+          
           if [ -f .config ]; then
-            echo "当前.config文件中的目标设备:"
-            grep -i "target\|jdcloud\|ipq60xx" .config || echo "未找到目标设备配置"
+            echo "✅ .config文件存在"
+            echo ""
+            
+            echo "📊 目标架构配置:"
+            echo "------------------------------------------"
+            grep -E "CONFIG_TARGET_" .config | head -30
+            
+            echo ""
+            echo "🔍 JDCloud RE-CS-02 特定配置:"
+            echo "------------------------------------------"
+            grep -i "jdcloud\|ipq60xx\|qualcommax" .config || echo "未找到JDCloud相关配置"
+            
+            echo ""
+            echo "⚠️ 检查是否有x86配置（不应该有）:"
+            echo "------------------------------------------"
+            grep -i "x86\|x86_64" .config && echo "警告：发现x86配置！" || echo "✅ 未发现x86配置"
+            
           else
             echo "❌ .config文件不存在！"
             exit 1
           fi
-      
-      - name: 下载依赖包
+          
+          echo "=========================================="
+          
+      - name: 下载依赖包（修复版）
         run: |
           cd openwrt
           echo "📥 下载依赖包..."
-          make defconfig
+          echo "⚠️ 注意：已移除 make defconfig，使用现有.config文件"
+          
+          # 重要：不再使用 make defconfig，避免覆盖配置
+          # 直接下载依赖包
           make download -j$(nproc) || make download -j1
-      
+          
       - name: 编译固件
         timeout-minutes: 120
         run: |
           cd openwrt
           echo "🔨 使用 $(nproc) 线程编译..."
-          echo "目标架构:"
-          grep -i "target\|arch" .config | head -5
+          
+          echo "📊 最终编译配置验证:"
+          echo "------------------------------------------"
+          grep -E "CONFIG_TARGET_BOARD|CONFIG_TARGET_SUBTARGET|CONFIG_TARGET_PROFILE|CONFIG_TARGET_ARCH_PACKAGES" .config
+          echo "------------------------------------------"
           
           make -j$(nproc) || make -j1 || make -j1 V=s
-      
+          
       - name: 验证编译结果
         if: success()
         run: |
           echo "📊 检查编译结果..."
+          
+          echo "🔍 查找固件文件:"
           find openwrt/bin/targets -name "*.bin" -o -name "*.img" -o -name "*.gz" 2>/dev/null | head -10
+          
           echo ""
           echo "📁 固件目录结构:"
           find openwrt/bin/targets -type d 2>/dev/null
-      
+          
+          echo ""
+          echo "🎯 验证目标设备固件:"
+          find openwrt/bin/targets -name "*jdcloud*" -o -name "*ipq60xx*" -o -name "*qualcommax*" 2>/dev/null || echo "未找到目标设备固件"
+          
       - name: 上传固件
         if: success()
         uses: actions/upload-artifact@v4
