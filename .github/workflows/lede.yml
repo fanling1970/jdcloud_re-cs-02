@@ -1,4 +1,4 @@
-name: LEDE编译智能版
+name: LEDE编译终极版
 
 on:
   workflow_dispatch:
@@ -6,160 +6,36 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: 验证配置文件
+    - name: 克隆LEDE源码
+      run: git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede-src
+    
+    - name: 应用配置
       run: |
-        echo "🔍 验证配置文件..."
-        
-        # 检查智能配置文件是否存在
-        if [ ! -f "lede/ax6600-smart.config" ]; then
-          echo "❌ 错误：智能配置文件不存在，创建中..."
-          # 创建智能配置文件
-          cat > lede/ax6600-smart.config << 'EOF'
-# LEDE智能配置 - 自动生成
-CONFIG_TARGET_qualcommax=y
-CONFIG_TARGET_qualcommax_ipq60xx=y
-CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_jdcloud_re-cs-02=y
-# CONFIG_TARGET_x86 is not set
-# CONFIG_TARGET_x86_64 is not set
-CONFIG_TARGET_BOARD="qualcommax"
-CONFIG_TARGET_SUBTARGET="ipq60xx"
-CONFIG_TARGET_PROFILE="DEVICE_jdcloud_re-cs-02"
-CONFIG_TARGET_ARCH_PACKAGES="aarch64_cortex-a53"
-CONFIG_DEFAULT_base-files=y
-CONFIG_DEFAULT_busybox=y
-CONFIG_DEFAULT_dropbear=y
-CONFIG_DEFAULT_firewall=y
-CONFIG_DEFAULT_fstools=y
-CONFIG_DEFAULT_luci=y
-CONFIG_DEFAULT_netifd=y
-CONFIG_DEFAULT_opkg=y
-CONFIG_DEFAULT_uci=y
-CONFIG_TARGET_ROOTFS_SQUASHFS=y
-CONFIG_TARGET_ROOTFS_INITRAMFS=y
-EOF
+        cd lede-src
+        if [ -f "../lede/ax6600-smart.config" ]; then
+          cp ../lede/ax6600-smart.config .config
+        else
+          echo "使用默认配置"
         fi
-        
-        echo "✅ 配置文件验证/创建完成"
-        
-    - name: 克隆LEDE最新源码
-      run: |
-        echo "📥 克隆LEDE最新源码..."
-        git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede-src
-        
-        echo "🔍 检查源码信息..."
-        cd lede-src
-        echo "最新提交:"
-        git log --oneline -1
-        echo "源码大小:"
-        du -sh .
-        
-    - name: 应用智能配置
-      run: |
-        echo "🔧 应用智能配置..."
-        cd lede-src
-        
-        # 清理旧配置
-        rm -f .config .config.old 2>/dev/null || true
-        
-        # 应用智能配置
-        cp ../lede/ax6600-smart.config .config
-        
-        # 验证配置
-        echo "📋 配置验证:"
-        echo "目标架构:"
-        grep -i "CONFIG_TARGET_qualcommax" .config || echo "❌ 缺少qualcommax配置"
-        echo ""
-        echo "x86配置（应该没有）:"
-        grep -i "CONFIG_TARGET_x86" .config || echo "✅ 未发现x86配置"
-        
-    - name: 更新feeds（安全模式）
+    
+    - name: 更新feeds
       run: |
         cd lede-src
-        echo "🔄 更新feeds..."
-        
-        # 备份配置
-        cp .config .config.before_feeds
-        
-        # 更新feeds
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-        
-        # 检查配置是否被修改
-        if ! cmp -s .config .config.before_feeds; then
-          echo "⚠️ 配置在更新feeds时被修改，恢复备份..."
-          cp .config.before_feeds .config
-        fi
-        
-    - name: 配置检查与修复
+    
+    - name: 编译
       run: |
         cd lede-src
-        echo "🔍 配置检查与修复..."
-        
-        # 运行defconfig让LEDE完善配置
         make defconfig
-        
-        # 检查最终配置
-        echo "🎯 最终配置检查:"
-        echo "目标设备:"
-        grep -i "jdcloud" .config || echo "未找到jdcloud配置"
-        echo ""
-        echo "架构检查:"
-        grep -E "^CONFIG_TARGET_" .config | grep -v "is not set" || echo "未找到启用的目标架构"
-        
-    - name: 下载依赖
-      run: |
-        cd lede-src
-        echo "📥 下载依赖..."
-        make download -j$(nproc) || make download -j1
-        
-    - name: 编译固件
-      run: |
-        cd lede-src
-        echo "🔨 开始编译..."
-        echo "时间: $(date)"
-        echo "CPU核心: $(nproc)"
-        
-        # 编译
-        make -j$(nproc) 2>&1 | tee build.log || {
-          echo "⚠️ 并行编译失败，尝试单线程..."
-          make -j1 V=s 2>&1 | tee -a build.log
-        }
-        
-        echo "⏱️ 编译完成时间: $(date)"
-        
-    - name: 验证编译结果
-      run: |
-        echo "🔍 验证编译结果..."
-        cd lede-src
-        
-        # 检查固件目录
-        FIRMWARE_DIR="bin/targets/qualcommax/ipq60xx"
-        if [ -d "$FIRMWARE_DIR" ]; then
-          echo "🎉 成功编译ARM固件！"
-          echo "目录: $FIRMWARE_DIR"
-          find "$FIRMWARE_DIR" -name "*.bin" -o -name "*.img" | head -5
-          
-          # 显示文件大小
-          for file in $(find "$FIRMWARE_DIR" -name "*.bin" -o -name "*.img" | head -3); do
-            size=$(stat -c "%s" "$file" 2>/dev/null || echo "0")
-            size_mb=$((size/1024/1024))
-            echo "  $(basename "$file"): $size_mb MB"
-          done
-        else
-          echo "❌ 未找到ARM固件"
-          echo "所有targets目录:"
-          find bin/targets -type d 2>/dev/null || echo "未找到targets目录"
-          exit 1
-        fi
-        
-    - name: 上传固件
+        make -j$(nproc)
+    
+    - name: 上传
       uses: actions/upload-artifact@v4
       with:
-        name: firmware-smart
+        name: firmware
         path: lede-src/bin/targets/
-        retention-days: 7
