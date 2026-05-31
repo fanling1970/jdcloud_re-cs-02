@@ -1,18 +1,18 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# File: .github/workflows/openwrt-bulder.yml
-# Description: Build OpenWrt using GitHub Actions
+# File: .github/workflows/openwrt-builder.yml
+# Description: Build OpenWrt using GitHub Actions (优化版)
 #
 # Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 
-name: LEDE固件编译
+name: LEDE固件编译（优化版）
 
 on:
-  workflow_dispatch:  # 仅手动触发，移除自动触发
+  workflow_dispatch:  # 仅手动触发
 
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede.git
@@ -31,38 +31,29 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    outputs:
-      deviceName: ${{ steps.compile.outputs.DEVICE_NAME }}
-      fileDate: ${{ steps.compile.outputs.FILE_DATE }}
     
     steps:
       - name: 检查磁盘空间使用情况
         run: |
           echo "编译前磁盘空间使用情况"
           echo "================================================================"
-          df -hT
+          df -h
           echo "================================================================"
       
-      - name: 优化磁盘空间
-        uses: "hugoalh/disk-space-optimizer-ghaction@v0.8.1"
-        with:
-          operate_sudo: "True"
-          general_include: ".+"
-          general_exclude: |-
-            ^GCC$
-            ^G\+\+$
-            Clang
-            LLVM
-          docker_include: ".+"
-          docker_prune: "True"
-          docker_clean: "True"
-          apt_prune: "True"
-          apt_clean: "True"
-          homebrew_prune: "True"
-          homebrew_clean: "True"
-          npm_prune: "True"
-          npm_clean: "True"
-          os_swap: "True"
+      - name: 快速磁盘空间优化
+        run: |
+          echo "开始快速磁盘空间优化..."
+          echo "清理APT缓存..."
+          sudo apt-get clean
+          
+          echo "清理不必要的包..."
+          sudo apt-get autoremove -y 2>/dev/null || true
+          
+          echo "清理临时文件..."
+          sudo rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
+          
+          echo "优化后磁盘空间使用情况:"
+          df -h
       
       - name: 最大化构建空间
         uses: easimon/maximize-build-space@master
@@ -75,86 +66,84 @@ jobs:
           remove-codeql: 'true'
           remove-docker-images: 'true'
       
-      - name: 磁盘空间优化完成
-        run: |
-          echo "磁盘空间优化完成"
-          echo "================================================================"
-          df -hT
-          echo "================================================================"
-      
       - name: 检出代码仓库
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
       
-      - name: 初始化编译环境（使用阿里云镜像源）
+      - name: 初始化编译环境（极速优化版）
+        timeout-minutes: 5
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          echo "开始初始化编译环境，使用阿里云镜像源加速..."
+          echo "🚀 开始极速初始化编译环境..."
           
-          # 备份原源文件
-          sudo cp /etc/apt/sources.list /etc/apt/sources.list.backup
+          # 使用阿里云镜像源加速
+          echo "📦 更换为阿里云镜像源..."
+          sudo sed -i 's|http://.*ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list
           
-          # 更换为阿里云镜像源（Ubuntu 22.04 Jammy Jellyfish）
-          echo "更换软件源为阿里云镜像..."
-          sudo sed -i 's|http://archive.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list
-          sudo sed -i 's|http://security.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list
+          # 快速更新软件包列表
+          echo "🔄 更新软件包列表..."
+          sudo apt-get update -o Acquire::http::No-Cache=True -o Acquire::BrokenProxy=true -qq
           
-          # 更新软件包列表
-          echo "更新软件包列表..."
-          sudo -E apt-get -qq update || { echo "第一次更新失败，重试..."; sudo -E apt-get -qq update; }
+          # 分步安装核心编译工具（避免一次性安装过多包）
+          echo "🔧 安装核心编译工具..."
+          CORE_PACKAGES="build-essential git gcc g++ make cmake autoconf automake libtool"
+          sudo apt-get install -y --no-install-recommends $CORE_PACKAGES
           
-          # 安装编译工具
-          echo "开始安装编译工具..."
-          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-          bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
-          git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
-          libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz \
-          mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools \
-          libpython3-dev qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip \
-          vim wget xmlto xxd zlib1g-dev python3-setuptools || { 
-            echo "部分包安装失败，尝试继续安装..."
-            sudo -E apt-get -qq install build-essential git curl wget vim nano gcc g++ make cmake autoconf automake libtool pkgconf
-          }
+          echo "📐 安装OpenWrt专用工具..."
+          OPENWRT_PACKAGES="bison flex gawk gettext bzip2 ccache cpio device-tree-compiler"
+          sudo apt-get install -y --no-install-recommends $OPENWRT_PACKAGES
           
-          echo "安装完成，开始清理..."
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
+          echo "🧰 安装开发库依赖..."
+          LIB_PACKAGES="libncurses5-dev libncursesw5-dev libssl-dev zlib1g-dev libelf-dev libgmp-dev libmpc-dev libmpfr-dev"
+          sudo apt-get install -y --no-install-recommends $LIB_PACKAGES
           
-          # 清理不必要的目录
-          echo "清理不必要的目录..."
-          sudo rm -rf /etc/apt/sources.list.d/* /usr/local/lib/android /opt/ghc /usr/share/dotnet /usr/local/graalvm /usr/local/.ghcup \
-          /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/node_modules
+          echo "🐍 安装Python相关工具..."
+          PYTHON_PACKAGES="python3 python3-pip python3-setuptools"
+          sudo apt-get install -y --no-install-recommends $PYTHON_PACKAGES
           
-          # 恢复原源文件（可选，建议保持阿里云源以提高后续步骤速度）
-          # sudo cp /etc/apt/sources.list.backup /etc/apt/sources.list
+          echo "📁 安装文件管理工具..."
+          FILE_PACKAGES="rsync subversion curl wget"
+          sudo apt-get install -y --no-install-recommends $FILE_PACKAGES
           
-          # 设置时区和权限
-          echo "设置时区和权限..."
+          # 清理
+          echo "🧹 清理安装缓存..."
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          
+          # 设置时区
+          echo "⏰ 设置时区..."
           sudo timedatectl set-timezone "$TZ"
-          sudo chown $USER:$GROUPS $GITHUB_WORKSPACE
           
-          echo "初始化编译环境完成！"
+          echo "✅ 初始化编译环境完成！总耗时预计：2-3分钟"
       
       - name: 克隆LEDE源代码
         working-directory: ./
         run: |
+          echo "📥 克隆LEDE源代码..."
           git clone --depth=1 $REPO_URL -b $REPO_BRANCH openwrt
+          echo "✅ 源代码克隆完成"
       
       - name: 加载自定义软件源配置
         run: |
+          echo "⚙️ 加载自定义软件源配置..."
           [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
           chmod +x $DIY_P1_SH
           cd openwrt
           $GITHUB_WORKSPACE/$DIY_P1_SH
       
       - name: 更新软件源
-        run: cd openwrt && ./scripts/feeds update -a
+        run: |
+          echo "🔄 更新软件源..."
+          cd openwrt && ./scripts/feeds update -a
       
       - name: 安装软件包
-        run: cd openwrt && ./scripts/feeds install -a
+        run: |
+          echo "📦 安装软件包..."
+          cd openwrt && ./scripts/feeds install -a
       
       - name: 加载自定义配置文件
         run: |
+          echo "⚙️ 加载自定义配置文件..."
           [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
           chmod +x $DIY_P2_SH
           cd openwrt
@@ -163,39 +152,56 @@ jobs:
       - name: 下载依赖包
         id: package
         run: |
+          echo "📥 下载依赖包..."
           cd openwrt
           make defconfig
-          make download -j8
+          make download -j$(nproc) || make download -j1
+          
+          # 清理过小的文件（可能是下载失败的文件）
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
       
       - name: 编译固件
         id: compile
+        timeout-minutes: 120  # 设置2小时超时
         run: |
+          echo "🔨 开始编译固件..."
           cd openwrt
-          echo -e "$(nproc) 线程编译"
-          make -j$(nproc) || make -j1 || make -j1 V=s
-          echo "status=success" >> $GITHUB_OUTPUT
+          echo "使用 $(nproc) 线程编译"
+          
+          # 尝试多线程编译，失败时降级
+          make -j$(nproc) || {
+            echo "多线程编译失败，尝试单线程编译..."
+            make -j1 V=s
+          }
+          
+          echo "✅ 编译完成"
+          
+          # 提取设备名称
           grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-          [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
-          echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+          [ -s DEVICE_NAME ] && echo "DEVICE_NAME=$(cat DEVICE_NAME)" >> $GITHUB_ENV
+          echo "FILE_DATE=$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
       
       - name: 检查编译后磁盘使用情况
-        if: ${{ always() }}
-        run: df -hT
+        if: always()
+        run: |
+          echo "编译后磁盘空间使用情况"
+          echo "================================================================"
+          df -h
+          echo "================================================================"
       
       - name: 整理固件文件
         id: organize
         if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
         run: |
+          echo "📦 整理固件文件..."
           cd openwrt/bin/targets/*/*
           rm -rf packages
-          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          echo "status=success" >> $GITHUB_OUTPUT
+          echo "FIRMWARE_DIR=$PWD" >> $GITHUB_ENV
       
       - name: 上传固件到Artifacts
-        uses: actions/upload-artifact@main
-        if: steps.organize.outputs.status == 'success' && !cancelled()
+        if: steps.organize.outcome == 'success' && !cancelled()
+        uses: actions/upload-artifact@v4
         with:
-          name: LEDE固件_${{ env.DEVICE_NAME }}_${{ env.FILE_DATE }}
-          path: ${{ env.FIRMWARE }}
+          name: LEDE固件_${{ env.DEVICE_NAME || 'unknown' }}_${{ env.FILE_DATE }}
+          path: ${{ env.FIRMWARE_DIR }}
