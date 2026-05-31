@@ -1,0 +1,43 @@
+name: 诊断配置问题
+on: workflow_dispatch
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        
+      - name: 诊断配置加载
+        run: |
+          echo "=== 配置加载诊断 ==="
+          echo ""
+          
+          echo "1. 📁 当前目录结构:"
+          ls -la
+          
+          echo ""
+          echo "2. 📄 检查ax6600.config文件:"
+          ls -la lede/ax6600.config
+          echo "文件大小:" $(wc -l < lede/ax6600.config) "行"
+          
+          echo ""
+          echo "3. 🔍 检查配置文件内容:"
+          echo "前5行:"
+          head -5 lede/ax6600.config
+          echo ""
+          echo "x86相关配置:"
+          grep -i "x86" lede/ax6600.config || echo "未找到x86配置"
+          echo ""
+          echo "qualcommax相关配置:"
+          grep -i "qualcommax" lede/ax6600.config || echo "未找到qualcommax配置"
+          
+          echo ""
+          echo "4. 🧪 模拟配置加载:"
+          cp lede/ax6600.config test.config
+          echo "模拟加载后的.config文件前20行:"
+          head -20 test.config
+          
+          echo ""
+          echo "5. 🎯 验证目标配置:"
+          grep -E "CONFIG_TARGET_" test.config | head -20
