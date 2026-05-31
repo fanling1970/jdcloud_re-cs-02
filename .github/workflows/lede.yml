@@ -10,32 +10,73 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: 更新feeds配置（可选）
+      run: |
+        echo "🔄 更新feeds配置为最新分支..."
+        # 如果feeds.conf.default存在且需要更新
+        if [ -f "lede/feeds.conf.default" ]; then
+          # 备份原文件
+          cp lede/feeds.conf.default lede/feeds.conf.default.backup
+          # 更新luci分支为master
+          sed -i 's|;openwrt-23.05|;master|g' lede/feeds.conf.default
+          echo "✅ feeds配置已更新"
+          echo "新配置:"
+          cat lede/feeds.conf.default
+        fi
+    
     - name: 克隆LEDE源码
       run: git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede-src
     
-    - name: 应用配置
+    - name: 复制feeds配置
+      run: |
+        cd lede-src
+        if [ -f "../lede/feeds.conf.default" ]; then
+          cp ../lede/feeds.conf.default feeds.conf.default
+          echo "✅ 已复制feeds配置"
+        else
+          echo "ℹ️ 使用LEDE默认feeds配置"
+        fi
+    
+    - name: 应用固件配置
       run: |
         cd lede-src
         if [ -f "../lede/ax6600-smart.config" ]; then
           cp ../lede/ax6600-smart.config .config
+          echo "✅ 已应用智能配置"
         else
-          echo "使用默认配置"
+          echo "ℹ️ 使用默认配置"
         fi
     
     - name: 更新feeds
       run: |
         cd lede-src
+        echo "🔄 更新feeds..."
         ./scripts/feeds update -a
         ./scripts/feeds install -a
     
     - name: 编译
       run: |
         cd lede-src
+        echo "🔨 开始编译..."
         make defconfig
-        make -j$(nproc)
+        make -j$(nproc) V=s 2>&1 | tee build.log || {
+          echo "⚠️ 并行编译失败，尝试单线程..."
+          make -j1 V=s 2>&1 | tee -a build.log
+        }
     
-    - name: 上传
+    - name: 验证结果
+      run: |
+        cd lede-src
+        if [ -d "bin/targets/qualcommax/ipq60xx" ]; then
+          echo "🎉 编译成功！"
+          ls -la bin/targets/qualcommax/ipq60xx/*.bin 2>/dev/null || true
+        else
+          echo "❌ 编译失败"
+          exit 1
+        fi
+    
+    - name: 上传固件
       uses: actions/upload-artifact@v4
       with:
-        name: firmware
+        name: firmware-ultimate
         path: lede-src/bin/targets/
