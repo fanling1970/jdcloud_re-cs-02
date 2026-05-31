@@ -9,36 +9,33 @@ cd lede-source
 git fetch origin
 git reset --hard origin/master
 
-# 2. 修复 vxlan 编译错误
-echo "修复 vxlan_find_mac 编译错误..."
-# 方法A：添加缺失的头文件包含
+# 2. 直接修复 vxlan 编译错误
+echo "直接修复 vxlan_find_mac 编译错误..."
+
+# 找到 vxlan_core.c 文件并修复
 find . -name "vxlan_core.c" -type f | while read file; do
-    if grep -q "vxlan_find_mac" "$file" && ! grep -q "vxlan_private.h" "$file"; then
-        echo "修复文件: $file"
-        sed -i 's/#include <net\/vxlan.h>/#include <net\/vxlan.h>\
+    echo "检查文件: $file"
+    if grep -q "vxlan_find_mac" "$file"; then
+        echo "发现需要修复的文件: $file"
+        
+        # 方法1：添加缺失的头文件包含
+        if ! grep -q "#include <net/vxlan_private.h>" "$file"; then
+            echo "添加缺失的头文件包含..."
+            sed -i 's/#include <net\/vxlan.h>/#include <net\/vxlan.h>\
 #include <net\/vxlan_private.h>/' "$file"
+            echo "已修复 $file"
+        fi
+        
+        # 方法2：如果找不到 vxlan_private.h，创建临时声明
+        if ! grep -q "struct vxlan_fdb \*vxlan_find_mac" "$file"; then
+            echo "添加 vxlan_find_mac 函数声明..."
+            sed -i '1i\
+/* 临时修复：添加 vxlan_find_mac 函数声明 */\
+struct vxlan_fdb *vxlan_find_mac(struct vxlan_dev *vxlan, const u8 *mac, __be32 vni);\
+' "$file"
+        fi
     fi
 done
-
-# 方法B：如果方法A不行，创建补丁文件
-cat > target/linux/generic/patches-6.12/999-fix-vxlan-implicit-declaration.patch << 'EOF'
-From: LEDE Compile Fix <fix@lede.org>
-Date: $(date)
-Subject: Fix implicit declaration of vxlan_find_mac
-
-Add missing header include for vxlan_find_mac declaration.
-
---- a/drivers/net/vxlan/vxlan_core.c
-+++ b/drivers/net/vxlan/vxlan_core.c
-@@ -10,6 +10,7 @@
- #include <net/rtnetlink.h>
- #include <net/switchdev.h>
- #include <net/vxlan.h>
-+#include <net/vxlan_private.h>
- 
- #define VXLAN_FDB_AGE_DEFAULT (10 * 60 * HZ)
- #define VXLAN_FDB_AGE_INTERVAL (10 * HZ)
-EOF
 
 # 3. 添加 mosdns 插件
 echo "添加 mosdns 插件..."
