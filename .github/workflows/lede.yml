@@ -2,17 +2,17 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 #
 # File: .github/workflows/openwrt-builder.yml
-# Description: Build OpenWrt using GitHub Actions (优化版)
+# Description: Build OpenWrt using GitHub Actions (最精简版)
 #
 # Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 
-name: LEDE固件编译（优化版）
+name: LEDE固件编译（最精简版）
 
 on:
-  workflow_dispatch:  # 仅手动触发
+  workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede.git
@@ -23,9 +23,6 @@ env:
   DIY_P2_SH: lede/diy-part2.sh
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
-  UPLOAD_COWTRANSFER: false
-  UPLOAD_WETRANSFER: false
-  UPLOAD_RELEASE: false
   TZ: Asia/Shanghai
 
 jobs:
@@ -33,175 +30,88 @@ jobs:
     runs-on: ubuntu-22.04
     
     steps:
-      - name: 检查磁盘空间使用情况
+      - name: 检查磁盘空间
         run: |
-          echo "编译前磁盘空间使用情况"
-          echo "================================================================"
+          echo "编译前磁盘空间:"
           df -h
-          echo "================================================================"
       
-      - name: 快速磁盘空间优化
+      - name: 快速磁盘清理
         run: |
-          echo "开始快速磁盘空间优化..."
-          echo "清理APT缓存..."
-          sudo apt-get clean
-          
-          echo "清理不必要的包..."
-          sudo apt-get autoremove -y 2>/dev/null || true
-          
-          echo "清理临时文件..."
+          sudo apt-get clean 2>/dev/null || true
           sudo rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
-          
-          echo "优化后磁盘空间使用情况:"
-          df -h
-      
-      - name: 最大化构建空间
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 2048
-          swap-size-mb: 1
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
-          remove-docker-images: 'true'
       
       - name: 检出代码仓库
         uses: actions/checkout@v4
       
-      - name: 初始化编译环境（极速优化版）
-        timeout-minutes: 5
+      - name: 初始化编译环境（最精简版）
+        timeout-minutes: 8
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          echo "🚀 开始极速初始化编译环境..."
+          echo "🚀 开始最精简初始化..."
           
-          # 使用阿里云镜像源加速
-          echo "📦 更换为阿里云镜像源..."
-          sudo sed -i 's|http://.*ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list
+          # 使用清华源加速
+          sudo cp /etc/apt/sources.list /etc/apt/sources.list.backup
+          sudo sed -i 's|http://.*ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
           
-          # 快速更新软件包列表
-          echo "🔄 更新软件包列表..."
-          sudo apt-get update -o Acquire::http::No-Cache=True -o Acquire::BrokenProxy=true -qq
+          echo "📦 快速更新软件包列表..."
+          sudo apt-get update -qq 2>/dev/null || echo "更新跳过"
           
-          # 分步安装核心编译工具（避免一次性安装过多包）
-          echo "🔧 安装核心编译工具..."
-          CORE_PACKAGES="build-essential git gcc g++ make cmake autoconf automake libtool"
-          sudo apt-get install -y --no-install-recommends $CORE_PACKAGES
+          echo "🔧 安装OpenWrt编译最小工具集..."
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            git \
+            gcc g++ make \
+            bison flex gawk gettext \
+            libncurses5-dev libncursesw5-dev \
+            python3 \
+            curl wget \
+            autoconf automake libtool \
+            libssl-dev zlib1g-dev
           
-          echo "📐 安装OpenWrt专用工具..."
-          OPENWRT_PACKAGES="bison flex gawk gettext bzip2 ccache cpio device-tree-compiler"
-          sudo apt-get install -y --no-install-recommends $OPENWRT_PACKAGES
-          
-          echo "🧰 安装开发库依赖..."
-          LIB_PACKAGES="libncurses5-dev libncursesw5-dev libssl-dev zlib1g-dev libelf-dev libgmp-dev libmpc-dev libmpfr-dev"
-          sudo apt-get install -y --no-install-recommends $LIB_PACKAGES
-          
-          echo "🐍 安装Python相关工具..."
-          PYTHON_PACKAGES="python3 python3-pip python3-setuptools"
-          sudo apt-get install -y --no-install-recommends $PYTHON_PACKAGES
-          
-          echo "📁 安装文件管理工具..."
-          FILE_PACKAGES="rsync subversion curl wget"
-          sudo apt-get install -y --no-install-recommends $FILE_PACKAGES
-          
-          # 清理
-          echo "🧹 清理安装缓存..."
-          sudo apt-get autoremove -y
-          sudo apt-get clean
+          # 恢复原源文件
+          sudo cp /etc/apt/sources.list.backup /etc/apt/sources.list
           
           # 设置时区
-          echo "⏰ 设置时区..."
           sudo timedatectl set-timezone "$TZ"
           
-          echo "✅ 初始化编译环境完成！总耗时预计：2-3分钟"
+          echo "✅ 初始化完成！"
       
       - name: 克隆LEDE源代码
-        working-directory: ./
         run: |
           echo "📥 克隆LEDE源代码..."
           git clone --depth=1 $REPO_URL -b $REPO_BRANCH openwrt
-          echo "✅ 源代码克隆完成"
       
-      - name: 加载自定义软件源配置
+      - name: 加载配置
         run: |
-          echo "⚙️ 加载自定义软件源配置..."
           [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-          chmod +x $DIY_P1_SH
-          cd openwrt
-          $GITHUB_WORKSPACE/$DIY_P1_SH
-      
-      - name: 更新软件源
-        run: |
-          echo "🔄 更新软件源..."
-          cd openwrt && ./scripts/feeds update -a
-      
-      - name: 安装软件包
-        run: |
-          echo "📦 安装软件包..."
-          cd openwrt && ./scripts/feeds install -a
-      
-      - name: 加载自定义配置文件
-        run: |
-          echo "⚙️ 加载自定义配置文件..."
           [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-          chmod +x $DIY_P2_SH
+          chmod +x $DIY_P1_SH $DIY_P2_SH
+      
+      - name: 更新和安装软件源
+        run: |
           cd openwrt
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          $GITHUB_WORKSPACE/$DIY_P1_SH
           $GITHUB_WORKSPACE/$DIY_P2_SH
       
       - name: 下载依赖包
-        id: package
         run: |
-          echo "📥 下载依赖包..."
           cd openwrt
           make defconfig
           make download -j$(nproc) || make download -j1
-          
-          # 清理过小的文件（可能是下载失败的文件）
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
       
       - name: 编译固件
-        id: compile
-        timeout-minutes: 120  # 设置2小时超时
+        timeout-minutes: 120
         run: |
-          echo "🔨 开始编译固件..."
           cd openwrt
           echo "使用 $(nproc) 线程编译"
-          
-          # 尝试多线程编译，失败时降级
-          make -j$(nproc) || {
-            echo "多线程编译失败，尝试单线程编译..."
-            make -j1 V=s
-          }
-          
-          echo "✅ 编译完成"
-          
-          # 提取设备名称
-          grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-          [ -s DEVICE_NAME ] && echo "DEVICE_NAME=$(cat DEVICE_NAME)" >> $GITHUB_ENV
-          echo "FILE_DATE=$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+          make -j$(nproc) || make -j1 || make -j1 V=s
       
-      - name: 检查编译后磁盘使用情况
-        if: always()
-        run: |
-          echo "编译后磁盘空间使用情况"
-          echo "================================================================"
-          df -h
-          echo "================================================================"
-      
-      - name: 整理固件文件
-        id: organize
-        if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
-        run: |
-          echo "📦 整理固件文件..."
-          cd openwrt/bin/targets/*/*
-          rm -rf packages
-          echo "FIRMWARE_DIR=$PWD" >> $GITHUB_ENV
-      
-      - name: 上传固件到Artifacts
-        if: steps.organize.outcome == 'success' && !cancelled()
+      - name: 上传固件
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: LEDE固件_${{ env.DEVICE_NAME || 'unknown' }}_${{ env.FILE_DATE }}
-          path: ${{ env.FIRMWARE_DIR }}
+          name: LEDE固件_$(date +%Y%m%d)
+          path: openwrt/bin/targets/*/*/
