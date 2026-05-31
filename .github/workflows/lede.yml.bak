@@ -11,7 +11,7 @@
 
 name: LEDE固件编译
 
-on:
+于:
   workflow_dispatch:  # 仅手动触发，移除自动触发
 
 env:
