@@ -1,25 +1,17 @@
-# ====================================================================
-# https://github.com/P3TERX/Actions-OpenWrt
-#
-# File: .github/workflows/openwrt-builder.yml
-# Description: Build OpenWrt using GitHub Actions (最精简版)
-#
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
-# ====================================================================
-
-name: LEDE固件编译（最精简版）
+name: LEDE固件编译（修复版）
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede.git
   REPO_BRANCH: master
   FEEDS_CONF: lede/feeds.conf.default
-  CONFIG_FILE: lede/ax6600.config # 重要：改为ax6600.config
+  CONFIG_FILE: lede/ax6600.config
   DIY_P1_SH: lede/diy-part1.sh
   DIY_P2_SH: lede/diy-part2.sh
   UPLOAD_BIN_DIR: false
@@ -29,184 +21,275 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 120
     
     steps:
-      - name: 检查磁盘空间
-        run: |
-          echo "编译前磁盘空间:"
-          df -h
-          
-      - name: 快速磁盘清理
-        run: |
-          sudo apt-get clean 2>/dev/null || true
-          sudo rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
-          
-      - name: 检出代码仓库
-        uses: actions/checkout@v4
+    - name: 检查磁盘空间
+      run: |
+        echo "编译前磁盘空间:"
+        df -h
         
-      - name: 验证源文件
-        run: |
-          echo "📁 检查lede目录内容:"
-          ls -la lede/
-          echo ""
-          echo "📄 检查ax6600.config是否存在:"
-          [ -f lede/ax6600.config ] && echo "✅ ax6600.config存在" || echo "❌ ax6600.config不存在"
-          echo ""
-          echo "🔍 检查目标设备配置:"
-          grep -i "jdcloud\|ipq60xx\|qualcommax" lede/ax6600.config || echo "未找到目标设备配置"
-          
-      - name: 初始化编译环境（最精简版）
-        timeout-minutes: 8
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          echo "🚀 开始最精简初始化..."
-          
-          # 使用清华源加速
-          sudo cp /etc/apt/sources.list /etc/apt/sources.list.backup
-          sudo sed -i 's|http://.*ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
-          
-          echo "📦 快速更新软件包列表..."
-          sudo apt-get update -qq 2>/dev/null || echo "更新跳过"
-          
-          echo "🔧 安装OpenWrt编译最小工具集..."
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
-            git \
-            gcc g++ make \
-            bison flex gawk gettext \
-            libncurses5-dev libncursesw5-dev \
-            python3 \
-            curl wget \
-            autoconf automake libtool \
-            libssl-dev zlib1g-dev
-          
-          # 恢复原源文件
-          sudo cp /etc/apt/sources.list.backup /etc/apt/sources.list
-          
-          # 设置时区
-          sudo timedatectl set-timezone "$TZ"
-          
-          echo "✅ 初始化完成！"
-          
-      - name: 克隆LEDE源代码
-        run: |
-          echo "📥 克隆LEDE源代码..."
-          git clone --depth=1 $REPO_URL -b $REPO_BRANCH openwrt
-          
-      - name: 加载配置（关键步骤）
-        run: |
-          echo "🔧 加载配置文件..."
-          
-          # 1. 加载feeds配置
-          if [ -e "$FEEDS_CONF" ]; then
-            echo "✅ 复制feeds.conf.default"
-            cp "$FEEDS_CONF" openwrt/feeds.conf.default
-          else
-            echo "❌ feeds.conf.default不存在"
-          fi
-          
-          # 2. 加载主配置文件（关键！）
-          if [ -e "$CONFIG_FILE" ]; then
-            echo "✅ 复制ax6600.config为.config"
-            cp "$CONFIG_FILE" openwrt/.config
-          else
-            echo "❌ ax6600.config不存在"
-            exit 1
-          fi
-          
-          # 3. 设置脚本权限
-          chmod +x "$DIY_P1_SH" "$DIY_P2_SH" 2>/dev/null || true
-          
-          echo "📋 验证.config文件内容:"
-          head -20 openwrt/.config
-          
-      - name: 更新和安装软件源
-        run: |
-          cd openwrt
-          echo "🔄 更新软件源..."
-          ./scripts/feeds update -a
-          echo "📦 安装软件包..."
-          ./scripts/feeds install -a
-          
-          # 执行自定义脚本
-          echo "⚙️ 执行自定义脚本..."
-          [ -f "$GITHUB_WORKSPACE/$DIY_P1_SH" ] && "$GITHUB_WORKSPACE/$DIY_P1_SH" || echo "diy-part1.sh跳过"
-          [ -f "$GITHUB_WORKSPACE/$DIY_P2_SH" ] && "$GITHUB_WORKSPACE/$DIY_P2_SH" || echo "diy-part2.sh跳过"
-          
-      - name: 验证目标配置（改进版）
-        run: |
-          cd openwrt
-          echo "🎯 验证目标设备配置..."
+    - name: 快速磁盘清理
+      run: |
+        sudo apt-get clean 2>/dev/null || true
+        sudo rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
+        
+    - name: 检出代码仓库
+      uses: actions/checkout@v4
+      with:
+        repository: fanling1970/jdcloud_re-cs-02
+        token: ${{ secrets.GITHUB_TOKEN }}
+        clean: true
+        fetch-depth: 1
+        
+    - name: 验证源文件
+      run: |
+        echo "📁 检查lede目录内容:"
+        ls -la lede/
+        echo ""
+        echo "📄 检查ax6600.config是否存在:"
+        [ -f lede/ax6600.config ] && echo "✅ ax6600.config存在" || echo "❌ ax6600.config不存在"
+        echo ""
+        echo "🔍 检查目标设备配置:"
+        grep -i "jdcloud\|ipq60xx\|qualcommax" lede/ax6600.config || echo "未找到目标设备配置"
+        
+    - name: 初始化编译环境（最精简版）
+      run: |
+        echo "🚀 开始最精简初始化..."
+        
+        # 使用清华源加速
+        sudo cp /etc/apt/sources.list /etc/apt/sources.list.backup
+        sudo sed -i 's|http://.*ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
+        
+        echo "📦 快速更新软件包列表..."
+        sudo apt-get update -qq 2>/dev/null || echo "更新跳过"
+        
+        echo "🔧 安装OpenWrt编译最小工具集..."
+        sudo apt-get install -y --no-install-recommends \
+          build-essential \
+          git \
+          gcc g++ make \
+          bison flex gawk gettext \
+          libncurses5-dev libncursesw5-dev \
+          python3 \
+          curl wget \
+          autoconf automake libtool \
+          libssl-dev zlib1g-dev
+        
+        # 恢复原源文件
+        sudo cp /etc/apt/sources.list.backup /etc/apt/sources.list
+        
+        # 设置时区
+        sudo timedatectl set-timezone "$TZ"
+        
+        echo "✅ 初始化完成！"
+        
+    - name: 克隆LEDE源代码
+      run: |
+        echo "📥 克隆LEDE源代码..."
+        git clone --depth=1 $REPO_URL -b $REPO_BRANCH openwrt
+        
+    - name: 加载配置（关键修复步骤）
+      run: |
+        echo "🔧 加载配置文件..."
+        
+        # 1. 加载feeds配置
+        if [ -e "$FEEDS_CONF" ]; then
+          echo "✅ 复制feeds.conf.default"
+          cp "$FEEDS_CONF" openwrt/feeds.conf.default
+        else
+          echo "❌ feeds.conf.default不存在"
+        fi
+        
+        # 2. 加载主配置文件（关键！）
+        if [ -e "$CONFIG_FILE" ]; then
+          echo "✅ 复制ax6600.config为.config"
+          cp "$CONFIG_FILE" openwrt/.config
+        else
+          echo "❌ ax6600.config不存在"
+          exit 1
+        fi
+        
+        # 3. 设置脚本权限
+        chmod +x "$DIY_P1_SH" "$DIY_P2_SH" 2>/dev/null || true
+        
+        echo "📋 验证.config文件内容:"
+        head -20 openwrt/.config
+        
+    - name: 锁定配置文件（关键修复）
+      run: |
+        echo "🔒 锁定配置文件，防止被自动修改..."
+        
+        # 验证配置文件正确性
+        echo "=== 加载后立即验证 ==="
+        if grep -q "CONFIG_TARGET_x86=y" openwrt/.config; then
+          echo "❌ 错误：配置文件被修改！发现x86配置"
+          grep -i "CONFIG_TARGET_x86" openwrt/.config
+          exit 1
+        fi
+        
+        if ! grep -q "CONFIG_TARGET_qualcommax=y" openwrt/.config; then
+          echo "❌ 错误：未找到qualcommax配置"
+          grep -i "CONFIG_TARGET_qualcommax" openwrt/.config || echo "未找到"
+          exit 1
+        fi
+        
+        echo "✅ 配置文件验证通过"
+        
+        # 锁定配置文件为只读
+        chmod 444 openwrt/.config
+        
+        # 创建备份
+        cp openwrt/.config openwrt/.config.backup
+        
+        echo "📋 验证锁定后的配置："
+        ls -la openwrt/.config
+        echo "配置权限："
+        stat -c "%A %n" openwrt/.config
+        echo "检查x86配置："
+        grep -i "CONFIG_TARGET_x86" openwrt/.config || echo "✅ 未发现x86配置"
+        echo "检查qualcommax配置："
+        grep -i "CONFIG_TARGET_qualcommax" openwrt/.config || echo "❌ 未找到qualcommax配置"
+        
+    - name: 更新和安装软件源
+      run: |
+        cd openwrt
+        echo "🔄 更新软件源..."
+        ./scripts/feeds update -a
+        echo "📦 安装软件包..."
+        ./scripts/feeds install -a
+        
+        # 执行自定义脚本
+        echo "⚙️ 执行自定义脚本..."
+        [ -f "$GITHUB_WORKSPACE/$DIY_P1_SH" ] && "$GITHUB_WORKSPACE/$DIY_P1_SH" || echo "diy-part1.sh跳过"
+        [ -f "$GITHUB_WORKSPACE/$DIY_P2_SH" ] && "$GITHUB_WORKSPACE/$DIY_P2_SH" || echo "diy-part2.sh跳过"
+        
+    - name: 验证目标配置（修复版）
+      run: |
+        echo "🎯 验证目标设备配置..."
+        echo "=========================================="
+        
+        # 检查配置文件是否存在
+        if [ -f "openwrt/.config" ]; then
+          echo "✅ .config文件存在"
+        else
+          echo "❌ .config文件不存在"
+          exit 1
+        fi
+        
+        echo ""
+        echo "📊 目标架构配置:"
+        echo "------------------------------------------"
+        grep -E "^CONFIG_TARGET_" openwrt/.config | grep -v "is not set" || echo "未找到已启用的目标架构"
+        
+        echo ""
+        echo "🔍 JDCloud RE-CS-02 特定配置:"
+        echo "------------------------------------------"
+        grep -i "jdcloud\|ipq60xx\|qualcommax" openwrt/.config || echo "未找到JDCloud相关配置"
+        
+        echo ""
+        echo "⚠️ 检查是否有x86配置（不应该有）:"
+        echo "------------------------------------------"
+        grep -E "^CONFIG_TARGET_x86" openwrt/.config || echo "✅ 未发现x86配置"
+        
+        # 关键验证：确保没有x86配置
+        if grep -q "CONFIG_TARGET_x86=y" openwrt/.config; then
+          echo "❌ 错误：发现x86配置！"
           echo "=========================================="
-          
-          if [ -f .config ]; then
-            echo "✅ .config文件存在"
-            echo ""
-            
-            echo "📊 目标架构配置:"
-            echo "------------------------------------------"
-            grep -E "CONFIG_TARGET_" .config | head -30
-            
-            echo ""
-            echo "🔍 JDCloud RE-CS-02 特定配置:"
-            echo "------------------------------------------"
-            grep -i "jdcloud\|ipq60xx\|qualcommax" .config || echo "未找到JDCloud相关配置"
-            
-            echo ""
-            echo "⚠️ 检查是否有x86配置（不应该有）:"
-            echo "------------------------------------------"
-            grep -i "x86\|x86_64" .config && echo "警告：发现x86配置！" || echo "✅ 未发现x86配置"
-            
-          else
-            echo "❌ .config文件不存在！"
-            exit 1
-          fi
-          
+          exit 1
+        fi
+        
+        # 关键验证：确保有qualcommax配置
+        if ! grep -q "CONFIG_TARGET_qualcommax=y" openwrt/.config; then
+          echo "❌ 错误：未找到qualcommax配置！"
           echo "=========================================="
+          exit 1
+        fi
+        
+        echo "✅ 配置验证通过"
+        echo "=========================================="
+        
+    - name: 下载依赖包（修复版）
+      run: |
+        cd openwrt
+        echo "📥 下载依赖包..."
+        echo "⚠️ 强制禁用自动配置重建"
+        
+        # 重要：使用环境变量禁用自动配置
+        # CONFIG_AUTOREBUILD= 禁用自动重建
+        # CONFIG_AUTOCONFIG= 禁用自动配置
+        CONFIG_AUTOREBUILD= CONFIG_AUTOCONFIG= make download -j$(nproc) || CONFIG_AUTOREBUILD= CONFIG_AUTOCONFIG= make download -j1
+        
+    - name: 编译前再次验证配置
+      run: |
+        echo "🔍 编译前最终配置验证..."
+        echo "=========================================="
+        
+        # 检查配置文件是否被修改
+        if ! cmp -s openwrt/.config openwrt/.config.backup; then
+          echo "❌ 警告：配置文件在下载依赖阶段被修改！"
+          echo "差异对比："
+          diff -u openwrt/.config.backup openwrt/.config | head -50
+          echo "=========================================="
+          exit 1
+        fi
+        
+        # 验证x86配置
+        if grep -q "CONFIG_TARGET_x86=y" openwrt/.config; then
+          echo "❌ 错误：编译前发现x86配置！"
+          grep -i "CONFIG_TARGET_x86" openwrt/.config
+          echo "=========================================="
+          exit 1
+        fi
+        
+        echo "✅ 最终验证通过，配置未被修改"
+        echo "=========================================="
+        
+    - name: 编译固件
+      run: |
+        cd openwrt
+        echo "🔨 开始编译固件..."
+        echo "使用核心数: $(nproc)"
+        
+        # 编译固件，禁用自动配置
+        CONFIG_AUTOREBUILD= CONFIG_AUTOCONFIG= make -j$(nproc) || CONFIG_AUTOREBUILD= CONFIG_AUTOCONFIG= make -j1 V=s
+        
+    - name: 验证编译结果
+      run: |
+        echo "🔍 验证编译结果..."
+        echo "=========================================="
+        
+        # 检查固件文件
+        if [ -d "openwrt/bin/targets" ]; then
+          echo "✅ 编译目录存在"
+          find openwrt/bin/targets -name "*.bin" -o -name "*.img" | head -10
           
-      - name: 下载依赖包（修复版）
-        run: |
-          cd openwrt
-          echo "📥 下载依赖包..."
-          echo "⚠️ 注意：已移除 make defconfig，使用现有.config文件"
-          
-          # 重要：不再使用 make defconfig，避免覆盖配置
-          # 直接下载依赖包
-          make download -j$(nproc) || make download -j1
-          
-      - name: 编译固件
-        timeout-minutes: 120
-        run: |
-          cd openwrt
-          echo "🔨 使用 $(nproc) 线程编译..."
-          
-          echo "📊 最终编译配置验证:"
-          echo "------------------------------------------"
-          grep -E "CONFIG_TARGET_BOARD|CONFIG_TARGET_SUBTARGET|CONFIG_TARGET_PROFILE|CONFIG_TARGET_ARCH_PACKAGES" .config
-          echo "------------------------------------------"
-          
-          make -j$(nproc) || make -j1 || make -j1 V=s
-          
-      - name: 验证编译结果
-        if: success()
-        run: |
-          echo "📊 检查编译结果..."
-          
-          echo "🔍 查找固件文件:"
-          find openwrt/bin/targets -name "*.bin" -o -name "*.img" -o -name "*.gz" 2>/dev/null | head -10
-          
+          # 检查固件类型
           echo ""
-          echo "📁 固件目录结构:"
-          find openwrt/bin/targets -type d 2>/dev/null
-          
-          echo ""
-          echo "🎯 验证目标设备固件:"
-          find openwrt/bin/targets -name "*jdcloud*" -o -name "*ipq60xx*" -o -name "*qualcommax*" 2>/dev/null || echo "未找到目标设备固件"
-          
-      - name: 上传固件
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: LEDE固件_$(date +%Y%m%d)
-          path: openwrt/bin/targets/*/*/
+          echo "📦 生成的固件文件："
+          find openwrt/bin/targets -type f $ -name "*.bin" -o -name "*.img" $ | while read file; do
+            echo "  - $file"
+            file "$file" || true
+          done
+        else
+          echo "❌ 编译目录不存在"
+          exit 1
+        fi
+        
+        echo "=========================================="
+        
+    - name: 上传固件
+      if: env.UPLOAD_FIRMWARE == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: lede-firmware
+        path: openwrt/bin/targets/
+        retention-days: 7
+        
+    - name: 上传整个bin目录
+      if: env.UPLOAD_BIN_DIR == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: lede-bin-full
+        path: openwrt/bin/
+        retention-days: 7
