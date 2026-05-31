@@ -71,40 +71,40 @@ git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config.git packa
 # git clone --depth=1 https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
 
 # adguardhome
-rm -rf feeds/packages/net/adguardhome
-rm -rf feeds/luci/applications/luci-app-adguardhome
-git clone --depth=1 -b lua https://github.com/sirpdboy/luci-app-adguardhome package/luci-app-adguardhome
+# rm -rf feeds/packages/net/adguardhome
+# rm -rf feeds/luci/applications/luci-app-adguardhome
+# git clone --depth=1 -b lua https://github.com/sirpdboy/luci-app-adguardhome package/luci-app-adguardhome
 # git clone --depth=1 https://github.com/xptsp/luci-app-adguardhome package/luci-app-adguardhome
 # git clone --depth=1 https://github.com/kongfl888/luci-app-adguardhome package/luci-app-adguardhome
 # git clone --depth=1 https://github.com/rufengsuixing/luci-app-adguardhome.git package/luci-app-adguardhome
 
 # mosdns
-rm -rf feeds/packages/net/mosdns
-rm -rf feeds/luci/applications/luci-app-mosdns
-git clone --depth=1 -b v5 https://github.com/sbwml/luci-app-mosdns package/luci-app-mosdns
+# rm -rf feeds/packages/net/mosdns
+# rm -rf feeds/luci/applications/luci-app-mosdns
+# git clone --depth=1 -b v5 https://github.com/sbwml/luci-app-mosdns package/luci-app-mosdns
 
 # smartdns
-rm -rf feeds/packages/net/smartdns
-rm -rf feeds/luci/applications/luci-app-smartdns
-git clone --depth=1 https://github.com/pymumu/openwrt-smartdns.git  feeds/packages/net/smartdns
-git clone --depth=1 https://github.com/pymumu/luci-app-smartdns.git feeds/luci/applications/luci-app-smartdns
+# rm -rf feeds/packages/net/smartdns
+# rm -rf feeds/luci/applications/luci-app-smartdns
+# git clone --depth=1 https://github.com/pymumu/openwrt-smartdns.git  feeds/packages/net/smartdns
+# git clone --depth=1 https://github.com/pymumu/luci-app-smartdns.git feeds/luci/applications/luci-app-smartdns
 # git clone --depth=1 -b lede https://github.com/pymumu/luci-app-smartdns.git feeds/luci/applications/luci-app-smartdns
 
 # openclash（ dev 版 ）( Mihomo Kernel )
-rm -rf feeds/luci/applications/luci-app-openclash
-git clone --depth=1 -b dev https://github.com/vernesong/OpenClash.git package/luci-app-openclash
+# rm -rf feeds/luci/applications/luci-app-openclash
+# git clone --depth=1 -b dev https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 # git clone -b master https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 
 # homeproxy ( SingBox Kernel )
-rm -rf feeds/luci/applications/luci-app-homeproxy
-git clone --depth=1 -b dev https://github.com/immortalwrt/homeproxy.git package/luci-app-homeproxy
+# rm -rf feeds/luci/applications/luci-app-homeproxy
+# git clone --depth=1 -b dev https://github.com/immortalwrt/homeproxy.git package/luci-app-homeproxy
 
 # passwall(2) ( SingBox & Xray Kernel )
 # 移除 openwrt feeds 过时的luci版本
-rm -rf feeds/luci/applications/luci-app-passwall
-rm -rf feeds/luci/applications/luci-app-passwall2
-git clone --depth=1 -b main https://github.com/xiaorouji/openwrt-passwall.git package/luci-app-passwall
-git clone --depth=1 -b main https://github.com/xiaorouji/openwrt-passwall2.git package/luci-app-passwall2
+# rm -rf feeds/luci/applications/luci-app-passwall
+# rm -rf feeds/luci/applications/luci-app-passwall2
+# git clone --depth=1 -b main https://github.com/xiaorouji/openwrt-passwall.git package/luci-app-passwall
+# git clone --depth=1 -b main https://github.com/xiaorouji/openwrt-passwall2.git package/luci-app-passwall2
 
 # 移除 openwrt feeds 自带的核心库
 # rm -rf feeds/packages/net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
@@ -113,7 +113,7 @@ git clone --depth=1 -b main https://github.com/xiaorouji/openwrt-passwall-packag
 
 # nikki( Mihomo Kernel )
 # git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/luci-app-nikki
-git clone --depth=1 -b main https://github.com/nikkinikki-org/OpenWrt-nikki.git package/luci-app-nikki
+# git clone --depth=1 -b main https://github.com/nikkinikki-org/OpenWrt-nikki.git package/luci-app-nikki
 
 # momo ( SingBox Kernel )
 # git clone --depth=1 -b main https://github.com/nikkinikki-org/OpenWrt-momo.git package/luci-app-momo
