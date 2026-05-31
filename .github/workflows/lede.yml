@@ -1,4 +1,4 @@
-name: LEDE固件编译（终极修复版）
+name: LEDE固件编译（终极修复版 - 修正Token）
 
 on:
   workflow_dispatch:
@@ -41,7 +41,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: fanling1970/jdcloud_re-cs-02
-        token: $
+        token: ${{ secrets.GITHUB_TOKEN }}  # ✅ 修复这里！
         clean: true
         fetch-depth: 1
         
