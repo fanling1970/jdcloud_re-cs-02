@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🔧 DIY Part 1: 强制应用精简配置"
+echo "🔧 DIY Part 1: 强制应用精简配置（最终版本）"
 
 # 1. 更新 LEDE 源码
 cd lede-source
@@ -52,4 +52,8 @@ EOF
 echo "应用配置..."
 make defconfig
 
-echo "✅ DIY Part 1 完成（强制应用最小化配置）"
+# 4. 备份配置，防止被覆盖
+echo "备份配置..."
+cp .config .config.backup
+
+echo "✅ DIY Part 1 完成（最终版本）"
