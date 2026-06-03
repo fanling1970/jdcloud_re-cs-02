@@ -5,10 +5,10 @@ echo "执行时间: $(date)"
 # ==========================================
 # 1. 拉取插件（你已有 kenzok8）
 # ==========================================
-echo "📦 拉取插件..."
-git clone --depth=1 https://github.com/kenzok8/openwrt-packages.git package/kenzok8
-git clone --depth=1 https://github.com/kenzok8/small.git package/small
-echo "✅ 插件完成"
+# echo "📦 拉取插件..."
+# git clone --depth=1 https://github.com/kenzok8/openwrt-packages.git package/kenzok8
+# git clone --depth=1 https://github.com/kenzok8/small.git package/small
+# echo "✅ 插件完成"
 
 # ==========================================
 # 2. 固定管理 IP（config_generate 会被 firstboot 使用）
