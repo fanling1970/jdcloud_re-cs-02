@@ -1,0 +1,145 @@
+name: LEDE编译简化版（基础网络+WiFi）
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_diy:
+        description: '跳过DIY脚本'
+        required: false
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: 检查DIY脚本
+      run: |
+        echo "检查DIY脚本..."
+        if [ -f "lede/diy-part2.sh" ]; then
+          echo "找到: lede/diy-part2.sh ($(wc -l < "lede/diy-part2.sh") 行)"
+          chmod +x "lede/diy-part2.sh" 2>/dev/null || true
+        else
+          echo "未找到: lede/diy-part2.sh"
+        fi
+    
+    - name: 克隆LEDE源码
+      run: git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede-src
+    
+    - name: 执行DIY Part 1
+      run: |
+        if [ -f "lede/diy-part1.sh" ] && [ -s "lede/diy-part1.sh" ]; then
+          cd lede-src && ../lede/diy-part1.sh
+        fi
+    
+    - name: 验证并应用配置
+      run: |
+        if [ ! -f "lede/ax6600-smart.config" ]; then
+          echo "配置文件不存在"; exit 1
+        fi
+        
+        # 清理Tab和BOM
+        sed -i 's/\t/ /g' "lede/ax6600-smart.config" 2>/dev/null || true
+        sed -i '1s/^\xEF\xBB\xBF//' "lede/ax6600-smart.config" 2>/dev/null || true
+        
+        cd lede-src
+        cp ../lede/ax6600-smart.config .config
+        echo "配置已应用 ($(wc -l < .config) 行)"
+    
+    - name: 更新feeds
+      run: |
+        cd lede-src
+        FORCE=1 ./scripts/feeds update -a
+        FORCE=1 ./scripts/feeds install -a
+    
+    - name: 执行DIY Part 2（基础配置）
+      run: |
+        if [ -f "lede/diy-part2.sh" ] && [ -s "lede/diy-part2.sh" ]; then
+          cd lede-src && ../lede/diy-part2.sh
+          echo "DIY Part 2 执行完成"
+        else
+          echo "跳过DIY Part 2"
+        fi
+    
+    - name: 解析配置依赖
+      run: |
+        cd lede-src
+        echo "Step 1: 解析配置依赖..."
+        make defconfig 2>&1 | grep -v "^WARNING:" | tail -5
+        
+        echo ""
+        echo "=== 最终配置验证 ==="
+        echo "插件检查:"
+        grep -E "CONFIG_PACKAGE.*(openclash|mosdns|passwall|argon|dockerman)=" .config || true
+        
+        if grep -q "CONFIG_PACKAGE_luci-app-openclash=y" .config; then
+          echo "✅ OpenClash 已启用"
+        fi
+        
+        if grep -q "CONFIG_PACKAGE_luci-app-mosdns=y" .config; then
+          echo "✅ MosDNS 已启用"
+        fi
+    
+    - name: 编译固件
+      run: |
+        cd lede-src
+        echo "开始编译..."
+        FORCE=1 make -j$(nproc) V=s 2>&1 | tee build.log || {
+          echo "并行编译失败，回退单线程..."
+          FORCE=1 make -j1 V=s 2>&1 | tee -a build.log
+        }
+        
+        # 检查编译结果
+        if ls bin/targets/qualcommax/ipq60xx/*.bin 2>/dev/null; then
+          echo "✅ 编译成功！"
+          ls -la bin/targets/qualcommax/ipq60xx/*.bin
+        else
+          echo "❌ 编译失败，无固件生成"
+          exit 1
+        fi
+    
+    - name: 上传固件
+      uses: actions/upload-artifact@v4
+      with:
+        name: firmware-lede-ax6600-simplified
+        path: lede-src/bin/targets/qualcommax/ipq60xx/*.bin
+    
+    - name: 生成编译报告
+      run: |
+        echo "=== 编译报告 ===" > report.txt
+        echo "时间: $(date)" >> report.txt
+        echo "仓库: fanling1970/lede-ax6600" >> report.txt
+        echo "分支: ${{ github.ref_name }}" >> report.txt
+        echo "" >> report.txt
+        
+        echo "配置摘要:" >> report.txt
+        echo "- 目标设备: JDCloud RE-CS-02 (AX6600)" >> report.txt
+        echo "- 管理IP: 192.168.100.1" >> report.txt
+        echo "- 登录密码: 空（首次登录后修改）" >> report.txt
+        echo "- WiFi: 3个接口 (2.4G+5G+5G)" >> report.txt
+        echo "- WiFi密码: 12345678" >> report.txt
+        echo "" >> report.txt
+        
+        echo "已安装插件:" >> report.txt
+        echo "- OpenClash (需手动配置)" >> report.txt
+        echo "- MosDNS (需手动配置)" >> report.txt
+        echo "- PassWall (需手动配置)" >> report.txt
+        echo "- SSR Plus+ (需手动配置)" >> report.txt
+        echo "- DockerMan (需手动配置)" >> report.txt
+        echo "- Argon 主题" >> report.txt
+        echo "" >> report.txt
+        
+        echo "注意事项:" >> report.txt
+        echo "1. 刷机后立即修改管理员密码" >> report.txt
+        echo "2. 插件需要手动配置才能使用" >> report.txt
+        echo "3. 建议备份配置: sysupgrade -b /tmp/backup.tar.gz" >> report.txt
+        
+        cat report.txt
+        
+    - name: 上传编译报告
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-report
+        path: report.txt
