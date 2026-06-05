@@ -58,6 +58,8 @@ passwd -d root
 # 设置 SSH 允许空密码登录（首次登录后建议关闭）
 uci set dropbear.@dropbear[0].PasswordAuth='on'
 uci set dropbear.@dropbear[0].RootPasswordAuth='on'
+# 新增：强制开启dropbear开机自启
+uci set dropbear.@dropbear[0].enable='1'
 uci commit dropbear
 
 # 设置时区
