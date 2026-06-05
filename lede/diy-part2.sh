@@ -1,285 +1,269 @@
 #!/bin/bash
-# diy-part2.sh - 简化版本
-# 只配置基础网络和WiFi，不固化插件配置
-# 适用于 JDCloud RE-CS-02 (AX6600) + LEDE
-# 生成时间: 2026-06-05
+echo "🔧 DIY Part 2: 编译后自定义操作 - 简化版"
+echo "执行时间: $(date)"
+echo "配置目标: 只固化基础网络和WiFi，插件配置刷机后手动完成"
 
-set -e
+# ====================================================================
+# 1. 网络配置固化
+# ====================================================================
+echo "设置网络配置..."
 
-echo "开始执行 diy-part2.sh 简化配置..."
-echo "配置目标: 基础网络 + 三个WiFi接口，不固化插件配置"
-
-# ========== 1. 网络基础配置 ==========
-echo "配置网络基础..."
-
-cat > $FILES/etc/config/network << 'EOF'
-config interface 'loopback'
-    option ifname 'lo'
-    option proto 'static'
-    option ipaddr '127.0.0.1'
-    option netmask '255.0.0.0'
-
-config globals 'globals'
-    option ula_prefix 'fdca:1ede:4578::/48'
-
-config interface 'lan'
-    option type 'bridge'
-    option ifname 'lan1 lan2 lan3 lan4'
-    option proto 'static'
-    option ipaddr '192.168.100.1'
-    option netmask '255.255.255.0'
-    option ip6assign '60'
-
-config interface 'wan'
-    option ifname 'wan'
-    option proto 'dhcp'
-
-config interface 'wan6'
-    option ifname 'wan'
-    option proto 'dhcpv6'
-EOF
-
-# ========== 2. 无线配置（三个接口） ==========
-echo "配置无线网络（三个接口）..."
-
-cat > $FILES/etc/config/wireless << 'EOF'
-# 无线配置 - JDCloud AX6600
-# 三个无线接口：2.4G + 5G + 5G
-# 密码统一：12345678
-
-config wifi-device 'radio0'
-    option type 'mac80211'
-    option band '5g'
-    option htmode 'HE80'
-    option channel '136'
-    option path 'platform/ahb/18100000.wifi'
-    option hwmode '11a'
-    option disabled '0'
-
-config wifi-iface 'default_radio0'
-    option device 'radio0'
-    option network 'lan'
-    option mode 'ap'
-    option ssid 'JDC_AX6600_5G'
-    option encryption 'psk2'
-    option key '12345678'
-
-config wifi-device 'radio1'
-    option type 'mac80211'
-    option band '2g'
-    option htmode 'HT40'
-    option channel '6'
-    option path 'platform/ahb/18100000.wifi+1'
-    option hwmode '11g'
-    option disabled '0'
-
-config wifi-iface 'default_radio1'
-    option device 'radio1'
-    option network 'lan'
-    option mode 'ap'
-    option ssid 'JDC_AX6600_2.4G'
-    option encryption 'psk2'
-    option key '12345678'
-
-config wifi-device 'radio2'
-    option type 'mac80211'
-    option band '5g'
-    option htmode 'HE80'
-    option channel '36'
-    option path 'platform/ahb/18100000.wifi+2'
-    option hwmode '11a'
-    option disabled '0'
-
-config wifi-iface 'default_radio2'
-    option device 'radio2'
-    option network 'lan'
-    option mode 'ap'
-    option ssid 'JDC_AX6600_5G2'
-    option encryption 'psk2'
-    option key '12345678'
-EOF
-
-# ========== 3. 基础 DHCP/DNS 配置 ==========
-echo "配置 DHCP/DNS 服务..."
-
-cat > $FILES/etc/config/dhcp << 'EOF'
-config dnsmasq
-    option domainneeded '1'
-    option boguspriv '1'
-    option filterwin2k '0'
-    option localise_queries '1'
-    option rebind_protection '1'
-    option rebind_localhost '1'
-    option local '/lan/'
-    option domain 'lan'
-    option expandhosts '1'
-    option nonegcache '0'
-    option authoritative '1'
-    option readethers '1'
-    option leasefile '/tmp/dhcp.leases'
-    option resolvfile '/tmp/resolv.conf.auto'
-    option nonwildcard '1'
-    option localservice '1'
-    list server '223.5.5.5'
-    list server '119.29.29.29'
-
-config dhcp 'lan'
-    option interface 'lan'
-    option start '100'
-    option limit '150'
-    option leasetime '12h'
-    option dhcpv4 'server'
-    option dhcpv6 'server'
-    option ra 'server'
-
-config dhcp 'wan'
-    option interface 'wan'
-    option ignore '1'
-
-config odhcpd 'odhcpd'
-    option maindhcp '0'
-    option leasefile '/tmp/hosts/odhcpd'
-    option leasetrigger '/usr/sbin/odhcpd-update'
-EOF
-
-# ========== 4. 系统基础配置 ==========
-echo "配置系统基础设置..."
-
-cat > $FILES/etc/config/system << 'EOF'
-config system
-    option hostname 'LEDE'
-    option timezone 'CST-8'
-    option zonename 'Asia/Shanghai'
-
-config timeserver 'ntp'
-    option enabled '1'
-    list server 'ntp.aliyun.com'
-    list server 'time1.cloud.tencent.com'
-    list server 'time.apple.com'
-
-config led 'led_sys'
-    option name 'SYS'
-    option sysfs 'led_sys'
-    option trigger 'heartbeat'
-EOF
-
-# ========== 5. 空密码登录配置 ==========
-echo "配置空密码登录（首次登录后修改）..."
-
-cat > $FILES/etc/uci-defaults/99-first-login << 'EOF'
+# 创建网络配置脚本（首次启动时执行）
+mkdir -p files/etc/uci-defaults
+cat > files/etc/uci-defaults/99-custom-network << 'EOF'
 #!/bin/sh
-# 首次启动配置脚本
-# 设置空密码登录，首次登录后请立即修改密码
 
-echo "首次启动配置..."
+echo "开始配置基础网络和WiFi..."
 
-# 删除 root 密码（设置为空）
-passwd -d root 2>/dev/null || true
+# 设置LAN口IP为192.168.100.1
+uci set network.lan.ipaddr='192.168.100.1'
+uci set network.lan.netmask='255.255.255.0'
+uci set network.lan.gateway='192.168.100.1'
+uci set network.lan.dns='192.168.100.1'
+uci commit network
 
-# 设置 SSH 允许空密码登录
+# 设置无线网络 - radio0 (5G)
+uci set wireless.radio0.channel='136'
+uci set wireless.radio0.band='5g'
+uci set wireless.radio0.htmode='HE80'
+uci set wireless.@wifi-iface[0].ssid='JDC_AX6600_5G'
+uci set wireless.@wifi-iface[0].key='12345678'
+uci set wireless.@wifi-iface[0].encryption='psk2'
+
+# 设置无线网络 - radio1 (2.4G)
+uci set wireless.radio1.channel='6'
+uci set wireless.radio1.band='2g'
+uci set wireless.radio1.htmode='HT40'
+uci set wireless.@wifi-iface[1].ssid='JDC_AX6600_2.4G'
+uci set wireless.@wifi-iface[1].key='12345678'
+uci set wireless.@wifi-iface[1].encryption='psk2'
+
+# 设置无线网络 - radio2 (5G2)
+uci set wireless.radio2.channel='36'
+uci set wireless.radio2.band='5g'
+uci set wireless.radio2.htmode='HE80'
+uci set wireless.@wifi-iface[2].ssid='JDC_AX6600_5G2'
+uci set wireless.@wifi-iface[2].key='12345678'
+uci set wireless.@wifi-iface[2].encryption='psk2'
+
+# 启用所有无线接口
+uci set wireless.radio0.disabled='0'
+uci set wireless.radio1.disabled='0'
+uci set wireless.radio2.disabled='0'
+uci commit wireless
+
+# 设置空密码（首次登录后强制修改）
+passwd -d root
+
+# 设置 SSH 允许空密码登录（首次登录后建议关闭）
 uci set dropbear.@dropbear[0].PasswordAuth='on'
 uci set dropbear.@dropbear[0].RootPasswordAuth='on'
 uci commit dropbear
 
-# 启用 SSH 服务
-/etc/init.d/dropbear enable
-/etc/init.d/dropbear start
+# 设置时区
+uci set system.@system[0].timezone='CST-8'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci commit system
 
-# 设置默认 DNS
-echo "nameserver 223.5.5.5" > /tmp/resolv.conf.auto
-echo "nameserver 119.29.29.29" >> /tmp/resolv.conf.auto
+# 重启网络相关服务
+/etc/init.d/network restart
+/etc/init.d/firewall restart
+/etc/init.d/dnsmasq restart
 
-# 确保 IP 转发开启
-echo 1 > /proc/sys/net/ipv4/ip_forward
-
-echo "首次启动配置完成。请立即登录并修改密码！"
-echo "登录地址: http://192.168.100.1"
-echo "SSH: root@192.168.100.1 (空密码)"
-
-exit 0
+echo "基础网络配置完成！"
+echo "=========================================="
+echo "管理地址: http://192.168.100.1"
+echo "用户名: root"
+echo "密码: 空 (首次登录后请立即修改)"
+echo "WiFi密码: 12345678"
+echo "=========================================="
 EOF
-chmod +x $FILES/etc/uci-defaults/99-first-login
+chmod +x files/etc/uci-defaults/99-custom-network
 
-# ========== 6. 基础启动脚本 ==========
-echo "配置启动脚本..."
+# ====================================================================
+# 2. 创建防火墙基础配置
+# ====================================================================
+echo "配置防火墙基础规则..."
 
-cat > $FILES/etc/rc.local << 'EOF'
-#!/bin/sh -e
+mkdir -p files/etc/config
+cat > files/etc/config/firewall << 'EOF'
+config defaults
+    option syn_flood '1'
+    option input 'ACCEPT'
+    option output 'ACCEPT'
+    option forward 'REJECT'
 
-# 基础启动脚本
-# 确保网络转发开启
-echo 1 > /proc/sys/net/ipv4/ip_forward
+config zone
+    option name 'lan'
+    list network 'lan'
+    option input 'ACCEPT'
+    option output 'ACCEPT'
+    option forward 'ACCEPT'
 
-# 设置防火墙基础规则（如果缺失）
-if ! iptables -t nat -L POSTROUTING -n | grep -q MASQUERADE; then
-    iptables -t nat -A POSTROUTING -o wan -j MASQUERADE
-fi
+config zone
+    option name 'wan'
+    list network 'wan'
+    list network 'wan6'
+    option input 'REJECT'
+    option output 'ACCEPT'
+    option forward 'REJECT'
+    option masq '1'
+    option mtu_fix '1'
 
-exit 0
-EOF
-chmod +x $FILES/etc/rc.local
+config forwarding
+    option src 'lan'
+    option dest 'wan'
 
-# ========== 7. 创建必要目录 ==========
-echo "创建必要目录结构..."
-mkdir -p $FILES/var/run
-mkdir -p $FILES/tmp
-mkdir -p $FILES/etc/uci-defaults
-mkdir -p $FILES/root
+config rule
+    option name 'Allow-DHCP-Renew'
+    option src 'wan'
+    option proto 'udp'
+    option dest_port '68'
+    option target 'ACCEPT'
+    option family 'ipv4'
 
-# ========== 8. 创建刷机后说明文件 ==========
-echo "创建刷机后说明文件..."
-
-cat > $FILES/root/README-FIRST.txt << 'EOF'
-==========================================
-          LEDE 固件刷机后说明
-==========================================
-
-固件信息:
-- 设备: JDCloud RE-CS-02 (AX6600)
-- 源码: coolsnowwolf/lede
-- 编译时间: 2026-06-05
-- 版本: LEDE 定制版
-
-网络配置:
-- 管理地址: 192.168.100.1
-- 登录密码: 空（首次登录后请立即修改）
-- WiFi SSID: JDC_AX6600_5G / JDC_AX6600_2.4G / JDC_AX6600_5G2
-- WiFi 密码: 12345678
-
-已安装插件（需手动配置）:
-- OpenClash
-- MosDNS
-- PassWall
-- ShadowSocksR Plus+
-- DockerMan
-- Argon 主题
-
-刷机后步骤:
-1. 连接 WiFi 或网线到 LAN 口
-2. 浏览器访问 http://192.168.100.1
-3. 使用空密码登录
-4. 立即修改管理员密码
-5. 按需配置插件
-
-重要提醒:
-- 首次登录后务必修改密码！
-- 插件需要手动配置才能使用
-- 建议备份配置: sysupgrade -b /tmp/backup.tar.gz
-
-技术支持:
-- 仓库: github.com/fanling1970/lede-ax6600
--JDC_AX6600_5G2 为第二个5G频段，可根据需要禁用
-
-==========================================
+config rule
+    option name 'Allow-Ping'
+    option src 'wan'
+    option proto 'icmp'
+    option icmp_type 'echo-request'
+    option family 'ipv4'
+    option target 'ACCEPT'
 EOF
 
-echo "========================================"
-echo "diy-part2.sh 简化版本执行完成！"
-echo "配置摘要:"
-echo "  1. 网络: 192.168.100.1/24, 空密码"
-echo "  2. 无线: 3个接口 (2.4G+5G+5G), 密码 12345678"
-echo "  3. 服务: DHCP/DNS, SSH, 空密码登录"
-echo "  4. 目录: 创建必要目录结构"
-echo "  5. 说明: 刷机后说明文件"
-echo "  6. 未固化: OpenClash/MosDNS 等插件配置"
-echo "========================================"
+# ====================================================================
+# 3. 创建系统基础配置
+# ====================================================================
+echo "配置系统基础设置..."
+
+cat > files/etc/config/system << 'EOF'
+config system
+    option hostname 'JDCloud-AX6600'
+    option timezone 'CST-8'
+    option ttylogin '0'
+    option log_size '64'
+    option urandom_seed '0'
+
+config timeserver 'ntp'
+    option enabled '1'
+    list server 'time1.aliyun.com'
+    list server 'time2.aliyun.com'
+    list server 'time3.aliyun.com'
+EOF
+
+# ====================================================================
+# 4. 创建使用说明文档（简化版）
+# ====================================================================
+mkdir -p files/root
+cat > files/root/README-SIMPLE-FIRMWARE.txt << 'EOF'
+==========================================
+      JDCloud RE-CS-02 简化固件说明
+===========================================
+
+固件编译时间: 2026-06-05
+固件版本: LEDE R26.05.20 + 基础插件
+配置策略: 只固化基础网络，插件配置刷机后手动完成
+
+一、基础配置
+------------
+1. 管理地址: http://192.168.100.1
+2. 用户名: root
+3. 密码: 空 (首次登录后强制修改)
+4. WiFi 接口:
+   - JDC_AX6600_5G (5G, 信道136)
+   - JDC_AX6600_2.4G (2.4G, 信道6)
+   - JDC_AX6600_5G2 (5G, 信道36)
+5. WiFi密码: 12345678
+
+二、已安装插件（需手动配置）
+---------------------------
+1. OpenClash: 代理工具
+   - 管理界面: 服务 → OpenClash
+   - 默认未启动，需上传节点配置
+
+2. MosDNS: DNS分流工具
+   - 管理界面: 服务 → MosDNS
+   - 默认配置可用，建议按需调整
+
+3. PassWall: 备用代理工具
+4. SSR Plus+: 备用代理工具
+5. DockerMan: Docker 管理界面
+6. Argon 主题: 美化界面
+
+三、刷机后操作步骤
+------------------
+1. 首次登录: http://192.168.100.1 (空密码)
+2. 立即修改管理员密码
+3. 测试网络连接和WiFi
+4. 按需配置插件:
+   a. OpenClash: 上传节点 → 启动服务
+   b. MosDNS: 检查配置 → 启动服务
+   c. 其他插件按需使用
+
+四、配置文件位置
+----------------
+1. 网络配置: /etc/config/network
+2. 无线配置: /etc/config/wireless
+3. 系统配置: /etc/config/system
+4. 防火墙: /etc/config/firewall
+
+五、注意事项
+------------
+1. 安全性: 首次登录后务必修改密码！
+2. 稳定性: 插件逐个配置，避免冲突
+3. 备份: 配置稳定后备份: sysupgrade -b /tmp/backup.tar.gz
+4. 第三个5G接口: 可根据需要禁用
+
+===========================================
+固件设计理念:
+- 基础网络稳定优先
+- 插件配置灵活可控
+- 减少固化冲突风险
+===========================================
+EOF
+
+# ====================================================================
+# 5. 创建简单的服务检查脚本
+# ====================================================================
+mkdir -p files/usr/bin
+cat > files/usr/bin/check-services << 'EOF'
+#!/bin/sh
+# 简单的服务状态检查脚本
+
+echo "=== 系统服务状态检查 ==="
+echo "当前时间: $(date)"
+echo ""
+
+echo "1. 网络服务:"
+ifconfig br-lan 2>/dev/null && echo "  ✓ LAN 接口正常" || echo "  ✗ LAN 接口异常"
+echo ""
+
+echo "2. WiFi 服务:"
+iwinfo 2>/dev/null | grep -q "ESSID" && echo "  ✓ WiFi 运行正常" || echo "  ✗ WiFi 可能异常"
+echo ""
+
+echo "3. 插件安装状态:"
+[ -f /etc/config/openclash ] && echo "  ✓ OpenClash 已安装" || echo "  ✗ OpenClash 未安装"
+[ -f /etc/config/mosdns ] && echo "  ✓ MosDNS 已安装" || echo "  ✗ MosDNS 未安装"
+[ -f /usr/bin/dockerd ] && echo "  ✓ Docker 已安装" || echo "  ✗ Docker 未安装"
+echo ""
+
+echo "4. 系统信息:"
+echo "  IP地址: $(uci get network.lan.ipaddr 2>/dev/null || echo '未配置')"
+echo "  主机名: $(uci get system.@system[0].hostname 2>/dev/null || echo '未配置')"
+echo ""
+
+echo "检查完成！"
+EOF
+chmod +x files/usr/bin/check-services
+
+echo "✅ DIY Part 2 简化版完成"
+echo "=========================================="
+echo "配置总结:"
+echo "1. 基础网络: ✓ (IP:192.168.100.1)"
+echo "2. 三个WiFi: ✓ (密码:12345678)"
+echo "3. 空密码登录: ✓ (首次登录后强制修改)"
+echo "4. OpenClash: ✗ (不固化配置)"
+echo "5. MosDNS: ✗ (不固化配置)"
+echo "6. 使用说明: ✓ (文件: /root/README-SIMPLE-FIRMWARE.txt)"
+echo "=========================================="
