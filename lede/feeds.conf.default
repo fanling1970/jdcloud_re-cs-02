@@ -9,8 +9,8 @@ src-git kenzo https://github.com/kenzok8/openwrt-packages.git
 src-git small https://github.com/kenzok8/small.git
 
 # Argon 主题
-src-git argon https://github.com/jerrykuku/luci-theme-argon;master
-src-git argon-config https://github.com/jerrykuku/luci-app-argon-config;master
+src-git argon https://github.com/jerrykuku/luci-theme-argon
+src-git argon-config https://github.com/jerrykuku/luci-app-argon-config
 
 # 注释掉有问题的源
 # src-git argon_theme https://github.com/jerrykuku/luci-theme-argon.git
