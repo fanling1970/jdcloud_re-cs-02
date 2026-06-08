@@ -19,7 +19,6 @@ echo "开始配置基础网络和WiFi..."
 uci set network.lan.ipaddr='192.168.100.1'
 uci set network.lan.netmask='255.255.255.0'
 uci set network.lan.gateway='192.168.100.1'
-uci set network.lan.dns='192.168.100.1'
 uci commit network
 
 # 设置无线网络 - radio0 (5G)
@@ -27,7 +26,7 @@ uci set wireless.radio0.channel='136'
 uci set wireless.radio0.band='5g'
 uci set wireless.radio0.htmode='HE80'
 uci set wireless.@wifi-iface[0].ssid='JDC_AX6600_5G'
-uci set wireless.@wifi-iface[0].key='12345678'
+uci set wireless.@wifi-iface[0].key='BUZHIDAOWA'
 uci set wireless.@wifi-iface[0].encryption='psk2'
 
 # 设置无线网络 - radio1 (2.4G)
@@ -35,7 +34,7 @@ uci set wireless.radio1.channel='6'
 uci set wireless.radio1.band='2g'
 uci set wireless.radio1.htmode='HT40'
 uci set wireless.@wifi-iface[1].ssid='JDC_AX6600_2.4G'
-uci set wireless.@wifi-iface[1].key='12345678'
+uci set wireless.@wifi-iface[1].key='BUZHIDAOWA'
 uci set wireless.@wifi-iface[1].encryption='psk2'
 
 # 设置无线网络 - radio2 (5G2)
@@ -43,7 +42,7 @@ uci set wireless.radio2.channel='36'
 uci set wireless.radio2.band='5g'
 uci set wireless.radio2.htmode='HE80'
 uci set wireless.@wifi-iface[2].ssid='JDC_AX6600_5G2'
-uci set wireless.@wifi-iface[2].key='12345678'
+uci set wireless.@wifi-iface[2].key='BUZHIDAOWA'
 uci set wireless.@wifi-iface[2].encryption='psk2'
 
 # 启用所有无线接口
