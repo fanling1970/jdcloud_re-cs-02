@@ -139,7 +139,7 @@ echo "配置系统基础设置..."
 
 cat > files/etc/config/system << 'EOF'
 config system
-    option hostname 'LEDE'
+    option hostname 'JDCloud-AX6600'
     option timezone 'CST-8'
     option ttylogin '0'
     option log_size '64'
