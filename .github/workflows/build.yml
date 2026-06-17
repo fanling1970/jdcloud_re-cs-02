@@ -82,6 +82,10 @@ jobs:
         sed -i '/CONFIG_PACKAGE_kmod-macvlan/d' .config
         sed -i '/CONFIG_PACKAGE_kmod-ipvlan/d' .config
         sed -i '/CONFIG_PACKAGE_kmod-br-netfilter/d' .config
+        # 清理旧的 LED 插件配置，确保后续注入生效
+        sed -i '/CONFIG_PACKAGE_luci-app-athena-led/d' .config
+        sed -i '/CONFIG_PACKAGE_luci-i18n-athena-led-zh-cn/d' .config
+
         
         cat >> .config <<- 'DOCKER_EOF'
         CONFIG_PACKAGE_luci-app-dockerman=y
