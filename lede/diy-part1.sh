@@ -71,5 +71,12 @@ find package/kernel target/linux -name "Makefile" -exec grep -l -E "kmod-(cgroup
 #     echo "✅ 已复制自定义软件包"
 # fi
 
+# ... 文件原有的其他命令 ...
+
+# 添加京东云 AX6600 LED 控制插件
+git clone --depth=1 https://github.com/NONGFAH/luci-app-athena-led package/luci-app-athena-led
+chmod +x package/luci-app-athena-led/root/etc/init.d/athena_led package/luci-app-athena-led/root/usr/sbin/athena-led
+
+
 echo ""
 echo "✅ DIY Part 1 完成"
