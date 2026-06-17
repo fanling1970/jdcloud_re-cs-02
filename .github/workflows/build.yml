@@ -117,7 +117,7 @@ jobs:
         CONFIG_PACKAGE_luci-app-argon-config=y
         
         # OpenClash
-        CONFIG_PACKAGE_luci-app-openclash=y
+        # CONFIG_PACKAGE_luci-app-openclash=n
         
         # Passwall
         # CONFIG_PACKAGE_luci-app-passwall=n
