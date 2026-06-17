@@ -12,7 +12,6 @@ src-git small https://github.com/kenzok8/small.git
 # ✅ Argon 官方源（推荐，避免 kenzok8 版本滞后）
 src-git argon https://github.com/jerrykuku/luci-theme-argon
 
-src-git luci-app-athena-led https://github.com/NONGFAH/luci-app-athena-led.git
 
 # 注释掉有问题的源
 # src-git argon_theme https://github.com/jerrykuku/luci-theme-argon.git
