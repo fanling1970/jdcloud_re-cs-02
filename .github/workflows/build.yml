@@ -130,8 +130,7 @@ jobs:
 
         CONFIG_PACKAGE_luci-app-quickstart=y
         CONFIG_PACKAGE_luci-app-store=y
-        CONFIG_PACKAGE_luci-app-linkease=y
-                
+                        
         # MosDNS
         # CONFIG_PACKAGE_luci-app-mosdns=n
         
