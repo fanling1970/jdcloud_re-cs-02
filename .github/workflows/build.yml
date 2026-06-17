@@ -116,19 +116,23 @@ jobs:
         CONFIG_PACKAGE_luci-app-openclash=y
         
         # Passwall
-        CONFIG_PACKAGE_luci-app-passwall=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_GO=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy=y
+        # CONFIG_PACKAGE_luci-app-passwall=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_GO=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy=n
+
+        CONFIG_PACKAGE_luci-app-quickstart=y
+        CONFIG_PACKAGE_luci-app-store=y
         
         # MosDNS
-        CONFIG_PACKAGE_luci-app-mosdns=y
+        # CONFIG_PACKAGE_luci-app-mosdns=n
         
         # LED 控制 (Athena)
         CONFIG_PACKAGE_luci-app-athena-led=y
+        CONFIG_PACKAGE_luci-i18n-athena-led-zh-cn=y
         
         # ====================================================================
         # 预设系统配置
