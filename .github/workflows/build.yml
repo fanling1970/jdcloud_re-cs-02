@@ -103,11 +103,21 @@ jobs:
         CONFIG_PACKAGE_fdisk=y
         CONFIG_PACKAGE_parted=y
         CONFIG_PACKAGE_lsblk=y
-        DOCKER_EOF
-        
+        DOCKER_EOF		
+		       
         echo ""
         echo "Step 3: 注入用户定制插件..."
         cat >> .config <<- 'PLUGINS_EOF'
+		# 24.10 LuCI 网络/无线页面核心依赖（必加）
+        CONFIG_PACKAGE_luci-mod-network=y
+        CONFIG_PACKAGE_luci-i18n-mod-network-zh-cn=y
+        CONFIG_PACKAGE_luci-mod-status=y
+        CONFIG_PACKAGE_luci-mod-system=y
+
+        # 无线射频管理工具（识别board校准文件、生成radio配置）
+        CONFIG_PACKAGE_wireless-tools=y
+        CONFIG_PACKAGE_iw=y
+        CONFIG_PACKAGE_hostapd-common=y
         # ====================================================================
         # 用户定制插件
         # ====================================================================
