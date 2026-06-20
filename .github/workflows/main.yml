@@ -20,7 +20,7 @@ jobs:
         swap-storage: true
         docker-images: false
 	- uses: actions/checkout@v4
-    
+
     - name: 检查DIY脚本
       run: |
         echo "检查DIY脚本..."
