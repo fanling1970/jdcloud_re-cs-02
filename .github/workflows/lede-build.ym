@@ -9,6 +9,17 @@ jobs:
     timeout-minutes: 180
     
     steps:
+    - name: 清理磁盘空间 (关键步骤)
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        swap-storage: true
+        docker-images: false
+
     - uses: actions/checkout@v4
     
     - name: 检查DIY脚本
@@ -25,20 +36,7 @@ jobs:
     
     - name: 克隆LEDE源码
       run: git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede-src
-
-    # ========== 新增：首次磁盘清理（克隆源码后） ==========
-    - name: 清理磁盘空间（首次）
-      uses: jlumbroso/free-disk-space@main
-      with:
-        tool-cache: true
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: true
-        swap-storage: true
-        docker-images: false   # 保留 Docker，避免影响后续构建
-    # ===================================================
-
+    
     - name: 应用自定义feeds源
       run: |
         cd lede-src
@@ -60,7 +58,7 @@ jobs:
         if [ ! -f "lede/ax6600-smart.config" ]; then
           echo "配置文件不存在"; exit 1
         fi
-        sed -i 's/	/    /g' "lede/ax6600-smart.config" 2>/dev/null || true
+        sed -i 's/\t/    /g' "lede/ax6600-smart.config" 2>/dev/null || true
         sed -i '1s/^\xEF\xBB\xBF//' "lede/ax6600-smart.config" 2>/dev/null || true
         cd lede-src
         cp ../lede/ax6600-smart.config .config
@@ -188,20 +186,6 @@ jobs:
         
         echo "所有配置验证通过"
     
-    # ========== 新增：第二次磁盘清理（下载依赖前） ==========
-    - name: 清理磁盘空间（二次）
-      run: |
-        echo "清理 APT 缓存..."
-        sudo apt-get clean
-        sudo rm -rf /var/lib/apt/lists/*
-        echo "清理临时文件..."
-        sudo rm -rf /tmp/*
-        echo "清理 Docker 资源..."
-        docker system prune -af
-        docker volume prune -f
-        echo "当前磁盘剩余：$(df -h / | tail -1)"
-    # ======================================================
-
     - name: 下载依赖包
       run: |
         cd lede-src
@@ -222,10 +206,10 @@ jobs:
         }
         
         if [ -f bin/targets/qualcommax/ipq60xx/openwrt-qualcommax-ipq60xx-jdcloud_re-cs-02-squashfs-sysupgrade.bin ]; then
-          echo " 编译成功！"
+          echo "✅ 编译成功！"
           echo "BUILD_SUCCESS=true" >> $GITHUB_ENV
         else
-          echo " 编译失败"
+          echo "❌ 编译失败"
           echo "BUILD_SUCCESS=false" >> $GITHUB_ENV
           echo "查看最后100行日志..."
           tail -100 build.log
