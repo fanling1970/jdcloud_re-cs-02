@@ -58,7 +58,7 @@ jobs:
         if [ ! -f "lede/ax6600-smart.config" ]; then
           echo "配置文件不存在"; exit 1
         fi
-        sed -i 's/\t/    /g' "lede/ax6600-smart.config" 2>/dev/null || true
+        sed -i 's/	/    /g' "lede/ax6600-smart.config" 2>/dev/null || true
         sed -i '1s/^\xEF\xBB\xBF//' "lede/ax6600-smart.config" 2>/dev/null || true
         cd lede-src
         cp ../lede/ax6600-smart.config .config
