@@ -23,37 +23,42 @@ uci commit network
 
 # 仅检测到无线射频硬件时才配置WiFi，无硬件则跳过，消除CAL加载报错
 if iwinfo devlist 2>/dev/null | grep -q radio; then
-    # 设置无线网络 - radio0 (主5G)
-    uci set wireless.radio0.channel='136'
-    uci set wireless.radio0.band='5g'
+    # 等待无线驱动完全加载
+    sleep 15
+    # 清空所有旧配置
+    rm -f /etc/config/wireless
+    # 自动生成正确的radio配置
+    wifi config > /etc/config/wireless
+    chmod 644 /etc/config/wireless
+    
+    # 设置参数（和你截图里的信道完全一致）
+    uci set wireless.radio0.channel='149'
     uci set wireless.radio0.htmode='HE80'
-    uci set wireless.@wifi-iface[0].ssid='JDC_AX6600_5G'
+    uci set wireless.@wifi-iface[0].ssid='JDC_AX6600_5G1'
     uci set wireless.@wifi-iface[0].key='BUZHIDAOWA'
     uci set wireless.@wifi-iface[0].encryption='psk2'
-
-    # 设置无线网络 - radio1 (2.4G)
-    uci set wireless.radio1.channel='6'
-    uci set wireless.radio1.band='2g'
+    
+    uci set wireless.radio1.channel='1'
     uci set wireless.radio1.htmode='HT40'
     uci set wireless.@wifi-iface[1].ssid='JDC_AX6600_2.4G'
     uci set wireless.@wifi-iface[1].key='BUZHIDAOWA'
     uci set wireless.@wifi-iface[1].encryption='psk2'
-
-    # 设置无线网络 - radio2 (副5G)
-    uci set wireless.radio2.channel='36'
-    uci set wireless.radio2.band='5g'
+    
+    uci set wireless.radio2.channel='44'
     uci set wireless.radio2.htmode='HE80'
     uci set wireless.@wifi-iface[2].ssid='JDC_AX6600_5G2'
     uci set wireless.@wifi-iface[2].key='BUZHIDAOWA'
     uci set wireless.@wifi-iface[2].encryption='psk2'
-
-    # 全部射频启用
+    
     uci set wireless.radio0.disabled='0'
     uci set wireless.radio1.disabled='0'
     uci set wireless.radio2.disabled='0'
     uci commit wireless
+    
+    # 强制重启无线
+    /etc/init.d/network reload
+    wifi reload
 fi
-
 # root空密码，首次登录强制修改
 passwd -d root
 
