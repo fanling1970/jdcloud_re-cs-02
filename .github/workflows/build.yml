@@ -119,27 +119,27 @@ jobs:
         # 用户定制插件
         # ====================================================================
         # Argon 主题
-        CONFIG_PACKAGE_luci-theme-argon=y
-        CONFIG_PACKAGE_luci-theme-argon-dark=y
-        CONFIG_PACKAGE_luci-app-argon-config=y
+        # CONFIG_PACKAGE_luci-theme-argon=n
+        # CONFIG_PACKAGE_luci-theme-argon-dark=n
+        # CONFIG_PACKAGE_luci-app-argon-config=n
         
         # OpenClash
-        CONFIG_PACKAGE_luci-app-openclash=y
+        # CONFIG_PACKAGE_luci-app-openclash=n
         
         # Passwall
-        CONFIG_PACKAGE_luci-app-passwall=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_GO=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=y
-        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy=y
+        # CONFIG_PACKAGE_luci-app-passwall=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_GO=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=n
+        # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy=n
         
         # MosDNS
         # CONFIG_PACKAGE_luci-app-mosdns=n
         
         # LED 控制 (Athena)
-        CONFIG_PACKAGE_luci-app-athena-led=y
+        # CONFIG_PACKAGE_luci-app-athena-led=n
         
         # ====================================================================
         # 预设系统配置
