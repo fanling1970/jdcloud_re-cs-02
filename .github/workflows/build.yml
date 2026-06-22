@@ -2,11 +2,16 @@ name: LEDE编译终极版（含DIY与Dockerman强制注入）
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'lede/**'
+      - '.github/workflows/**'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 180  # 添加超时设置，防止长时间占用
     
     steps:
     - uses: actions/checkout@v4
@@ -29,6 +34,7 @@ jobs:
     - name: 应用自定义feeds源
       run: |
         cd lede-src
+        # 复制你的自定义feeds配置文件
         if [ -f "../lede/feeds.conf.default" ]; then
           cp ../lede/feeds.conf.default .
           echo "已应用自定义feeds.conf.default ($(wc -l < feeds.conf.default) 行)"
@@ -47,8 +53,11 @@ jobs:
         if [ ! -f "lede/ax6600-smart.config" ]; then
           echo "配置文件不存在"; exit 1
         fi
+        
+        # 清理Tab和BOM
         sed -i 's/	/    /g' "lede/ax6600-smart.config" 2>/dev/null || true
         sed -i '1s/^\xEF\xBB\xBF//' "lede/ax6600-smart.config" 2>/dev/null || true
+        
         cd lede-src
         cp ../lede/ax6600-smart.config .config
         echo "配置已应用 ($(wc -l < .config) 行)"
@@ -74,6 +83,7 @@ jobs:
         
         echo ""
         echo "Step 2: 强制注入 Docker/Dockerman 配置..."
+        # 1. 先清除 .config 中所有可能冲突或错误的旧 docker 配置
         sed -i '/CONFIG_PACKAGE_.*docker/d' .config
         sed -i '/CONFIG_PACKAGE_.*containerd/d' .config
         sed -i '/CONFIG_PACKAGE_.*runc/d' .config
@@ -82,11 +92,8 @@ jobs:
         sed -i '/CONFIG_PACKAGE_kmod-macvlan/d' .config
         sed -i '/CONFIG_PACKAGE_kmod-ipvlan/d' .config
         sed -i '/CONFIG_PACKAGE_kmod-br-netfilter/d' .config
-        # 清理旧的 LED 插件配置，确保后续注入生效
-        sed -i '/CONFIG_PACKAGE_luci-app-athena-led/d' .config
-        sed -i '/CONFIG_PACKAGE_luci-i18n-athena-led-zh-cn/d' .config
-
-        # ✅ 关键修复1：使用<<-语法，支持缩进的结束符
+        
+        # 2. 追加经过验证的、当前源码中实际存在的最小完备集
         cat >> .config <<- 'DOCKER_EOF'
         CONFIG_PACKAGE_luci-app-dockerman=y
         CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y
@@ -107,51 +114,33 @@ jobs:
         
         echo ""
         echo "Step 3: 注入用户定制插件..."
-        # ✅ 关键修复2：同样使用<<-语法，所有内容统一缩进
         cat >> .config <<- 'PLUGINS_EOF'
-        # 24.10 LuCI 网络/无线页面核心依赖
-        CONFIG_PACKAGE_luci-mod-network=y
-        CONFIG_PACKAGE_luci-mod-status=y
-        CONFIG_PACKAGE_luci-mod-system=y
-        CONFIG_PACKAGE_wireless-tools=y
-        CONFIG_PACKAGE_iw=y
-        CONFIG_PACKAGE_hostapd-common=y
-
-        # 无线驱动（100%验证版）
-        CONFIG_PACKAGE_ath11k-firmware-qcn9074=y
         # ====================================================================
         # 用户定制插件
         # ====================================================================
         # Argon 主题
         CONFIG_PACKAGE_luci-theme-argon=y
+        CONFIG_PACKAGE_luci-theme-argon-dark=y
         CONFIG_PACKAGE_luci-app-argon-config=y
-
+        
         # OpenClash
-        # CONFIG_PACKAGE_luci-app-openclash=n
-
+        CONFIG_PACKAGE_luci-app-openclash=y
+        
         # Passwall
-        # CONFIG_PACKAGE_luci-app-passwall=n
-
-        CONFIG_PACKAGE_luci-app-quickstart=y
-        CONFIG_PACKAGE_luci-app-store=y
-        CONFIG_PACKAGE_luci-app-linkease=y
-                
+        CONFIG_PACKAGE_luci-app-passwall=y
+        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y
+        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y
+        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y
+        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_GO=y
+        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=y
+        CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy=y
+        
         # MosDNS
         # CONFIG_PACKAGE_luci-app-mosdns=n
-
+        
         # LED 控制 (Athena)
         CONFIG_PACKAGE_luci-app-athena-led=y
-        CONFIG_PACKAGE_luci-i18n-athena-led-zh-cn=y
-
-        # ====================================================================
-        # Samba4 文件共享服务
-        # ====================================================================
-        CONFIG_PACKAGE_samba4-server=y
-        CONFIG_PACKAGE_samba4-libs=y
-        CONFIG_PACKAGE_samba4-client=y
-        CONFIG_PACKAGE_luci-app-samba4=y
-        CONFIG_PACKAGE_luci-i18n-samba4-zh-cn=y
-
+        
         # ====================================================================
         # 预设系统配置
         # ====================================================================
@@ -159,6 +148,7 @@ jobs:
         CONFIG_TARGET_PREINIT_IP="192.168.100.1"
         CONFIG_TARGET_PREINIT_NETMASK="255.255.255.0"
         CONFIG_TARGET_PREINIT_BOARDNAME="JDCloud RE-CS-02"
+        # WiFi 设置（通过 diy-part2.sh 实现更可靠）
         PLUGINS_EOF
         
         echo "插件配置已注入"
@@ -169,9 +159,10 @@ jobs:
         
         echo ""
         echo "=== 关键插件配置验证 ==="
-        grep -E "CONFIG_PACKAGE_(luci-app-dockerman|luci-theme-argon|luci-mod-network)=" .config || true
+        grep -E "CONFIG_PACKAGE_(luci-app-dockerman|luci-theme-argon|luci-app-openclash|luci-app-passwall|luci-app-mosdns)=" .config || true
         echo ""
         
+        # 最终兜底验证
         if ! grep -q "CONFIG_PACKAGE_luci-app-dockerman=y" .config; then
           echo "致命错误：luci-app-dockerman 仍未被选中！"
           exit 1
@@ -198,28 +189,23 @@ jobs:
           FORCE=1 make -j1 V=s 2>&1 | tee -a build.log
         }
         
+        # 检查编译是否成功
         if [ -f bin/targets/qualcommax/ipq60xx/openwrt-qualcommax-ipq60xx-jdcloud_re-cs-02-squashfs-sysupgrade.bin ]; then
-          echo " 编译成功！"
+          echo "✅ 编译成功！"
           echo "BUILD_SUCCESS=true" >> $GITHUB_ENV
         else
-          echo " 编译失败"
+          echo "❌ 编译失败"
           echo "BUILD_SUCCESS=false" >> $GITHUB_ENV
           echo "查看最后100行日志..."
           tail -100 build.log
           exit 1
         fi
     
-    # ========== 新增步骤：生成当前时间戳 ==========
-    - name: 生成时间戳
-      id: timestamp
-      run: echo "BUILD_TIME=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
-      
     - name: 上传固件
       if: env.BUILD_SUCCESS == 'true'
       uses: actions/upload-artifact@v4
       with:
-        # 引用刚才生成的时间戳变量
-        name: jdcloud-ax6600-with-plugins-${{ env.BUILD_TIME }}
+        name: jdcloud-ax6600-with-plugins
         path: |
           lede-src/bin/targets/qualcommax/ipq60xx/*.bin
           lede-src/bin/targets/qualcommax/ipq60xx/*.manifest
@@ -229,6 +215,6 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: build-logs-${{ env.BUILD_TIME }}
+        name: build-logs
         path: lede-src/build.log
         retention-days: 7
