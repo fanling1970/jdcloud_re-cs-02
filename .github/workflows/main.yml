@@ -1,11 +1,21 @@
 name: 雅典娜RE-CS-02 指定Commit编译
 on:
-  workflow_dispatch: # 仅手动启动
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
+      # 第一步：清理系统释放磁盘空间（关键修复）
+      - name: 清理系统释放存储空间
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /var/lib/docker
+          sudo apt clean
+          df -h
+
       - name: 拉取仓库代码并锁定目标commit
         uses: actions/checkout@v4
         with:
