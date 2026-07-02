@@ -1,68 +1,76 @@
-name: 雅典娜RE-CS-02 79d246b 固定commit编译
+name: 京东云RE-CS-02 79d246b固定commit复刻编译
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 仅手动触发，无自动构建
 
 jobs:
-  build:
+  build_firmware:
     runs-on: ubuntu-22.04
     steps:
-      # 深度清理磁盘，解决空间爆满
-      - name: 系统深度清理释放空间
+      # 步骤1：深度清理系统，解决磁盘爆满崩溃
+      - name: 释放系统磁盘空间
         run: |
           sudo apt remove -y dotnet-sdk-* ghc-* firefox openjdk-*
           sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache /var/lib/docker /usr/local/lib/android
           sudo apt autoremove -y && sudo apt clean && sudo rm -rf /var/lib/apt/lists/*
           df -h
 
-      # 拉取指定commit代码并下载LFS射频校准文件
-      - name: 拉取源码
+      # 步骤2：拉取完整官方LEDE主源码（自带scripts/feeds编译骨架）
+      - name: 克隆完整coolsnowwolf/lede源码
+        run: git clone https://github.com/coolsnowwolf/lede.git lede
+
+      # 步骤3：拉取本仓库79d246b提交的DIY全部配置文件（开启LFS拉校准文件）
+      - name: 拉取固定commit的定制配置
         uses: actions/checkout@v4
         with:
+          repository: fanling1970/jdcloud_re-cs-02
           ref: 79d246b6d0336bd5352ecb878236e2e8fe31c009
-          fetch-depth: 0
-          lfs: true
+          path: diy_resource
+          lfs: true # 关键：下载board-2.bin射频校准文件，解决无网络
 
-      # 安装编译依赖
-      - name: 安装全套编译依赖
+      # 步骤4：复制DIY补丁、脚本、机型配置到完整lede源码内
+      - name: 合并定制配置到LEDE源码
+        run: |
+          cp -r diy_resource/lede/* lede/
+          cd lede
+          chmod +x diy-part1.sh diy-part2.sh
+          ./diy-part1.sh
+          ./diy-part2.sh
+
+      # 步骤5：安装全套编译依赖
+      - name: 安装编译环境依赖
         run: |
           sudo apt update
           sudo apt install -y build-essential libncurses-dev gawk flex bison quilt libssl-dev libelf-dev zlib1g-dev git wget curl unzip python3 python3-distutils rsync file ccache
 
-      # 关键：进入lede子目录再执行feeds命令
-      - name: 更新&安装feeds插件源
+      # 步骤6：更新、安装插件源（此时lede内存在完整scripts/feeds，不再报错）
+      - name: 更新并安装feeds软件源
         run: |
-          cd $GITHUB_WORKSPACE/lede
+          cd lede
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 加载机型配置
-      - name: 载入RE-CS-02配置
+      # 步骤7：载入RE-CS-02原厂机型配置
+      - name: 加载京东云雅典娜配置
         run: |
-          cd $GITHUB_WORKSPACE/lede
+          cd lede
           cp config/re-cs-02.config .config
           make defconfig
 
-      # 预下载源码包
-      - name: 下载源码依赖
-        run: |
-          cd $GITHUB_WORKSPACE/lede
-          make download -j$(nproc)
+      # 步骤8：预下载全部源码安装包，减少编译中途下载超时
+      - name: 预下载编译所需源码包
+        run: cd lede && make download -j$(nproc)
 
-      # 编译固件
-      - name: 编译固件
-        run: |
-          cd $GITHUB_WORKSPACE/lede
-          make -j$(nproc)
+      # 步骤9：多线程编译固件
+      - name: 编译OpenWrt固件
+        run: cd lede && make -j$(nproc)
 
-      # 清理dl缓存
-      - name: 清理下载缓存
-        run: |
-          cd $GITHUB_WORKSPACE/lede
-          rm -rf dl
+      # 步骤10：清理下载缓存，减少上传包体积
+      - name: 清理dl下载缓存
+        run: cd lede && rm -rf dl
 
-      # 上传固件，路径同步切换到lede下的bin目录
+      # 步骤11：上传编译完成的刷机img固件，任务结束可下载
       - name: 上传成品固件
         uses: actions/upload-artifact@v4
         with:
           path: lede/bin/targets/ipq60xx/generic/*.img
-          name: RE-CS02_79d246b正常固件
+          name: RE-CS02_79d246b_完整校准固件
