@@ -1,4 +1,4 @@
-name: 雅典娜RE-CS-02 19:11完整源码复刻编译
+name: 雅典娜RE-CS-02 79d246b 固定commit编译
 on:
   workflow_dispatch:
 
@@ -6,15 +6,15 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      # 深度清理，解决No space left磁盘爆满
-      - name: 深度清理系统释放磁盘空间
+      # 深度清理磁盘，解决空间爆满
+      - name: 系统深度清理释放空间
         run: |
           sudo apt remove -y dotnet-sdk-* ghc-* firefox openjdk-*
           sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache /var/lib/docker /usr/local/lib/android
           sudo apt autoremove -y && sudo apt clean && sudo rm -rf /var/lib/apt/lists/*
           df -h
 
-      # 拉取指定commit源码+下载LFS射频校准文件
+      # 拉取指定commit代码并下载LFS射频校准文件
       - name: 拉取源码
         uses: actions/checkout@v4
         with:
@@ -22,41 +22,47 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      # 安装编译依赖
       - name: 安装全套编译依赖
         run: |
           sudo apt update
           sudo apt install -y build-essential libncurses-dev gawk flex bison quilt libssl-dev libelf-dev zlib1g-dev git wget curl unzip python3 python3-distutils rsync file ccache
 
-      # 关键修复：先cd到源码根目录再执行feeds命令
-      - name: 更新并安装feeds插件源
+      # 关键：进入lede子目录再执行feeds命令
+      - name: 更新&安装feeds插件源
         run: |
-          cd $GITHUB_WORKSPACE
+          cd $GITHUB_WORKSPACE/lede
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: 加载RE-CS-02原厂机型配置
+      # 加载机型配置
+      - name: 载入RE-CS-02配置
         run: |
-          cd $GITHUB_WORKSPACE
+          cd $GITHUB_WORKSPACE/lede
           cp config/re-cs-02.config .config
           make defconfig
 
-      - name: 预下载所有源码包
+      # 预下载源码包
+      - name: 下载源码依赖
         run: |
-          cd $GITHUB_WORKSPACE
+          cd $GITHUB_WORKSPACE/lede
           make download -j$(nproc)
 
+      # 编译固件
       - name: 编译固件
         run: |
-          cd $GITHUB_WORKSPACE
+          cd $GITHUB_WORKSPACE/lede
           make -j$(nproc)
 
-      - name: 清理dl下载目录
+      # 清理dl缓存
+      - name: 清理下载缓存
         run: |
-          cd $GITHUB_WORKSPACE
+          cd $GITHUB_WORKSPACE/lede
           rm -rf dl
 
-      - name: 上传编译完成的img固件
+      # 上传固件，路径同步切换到lede下的bin目录
+      - name: 上传成品固件
         uses: actions/upload-artifact@v4
         with:
-          path: bin/targets/ipq60xx/generic/*.img
-          name: RE-CS02_79d246b正常版本固件
+          path: lede/bin/targets/ipq60xx/generic/*.img
+          name: RE-CS02_79d246b正常固件
