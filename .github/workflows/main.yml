@@ -31,7 +31,7 @@ jobs:
       - name: 打印DIY资源目录
         run: ls -la diy_resource/ diy_resource/lede/
 
-      # 4. 正确平铺复制脚本与配置到LEDE源码根目录
+      # 4. 复制脚本到lede源码根目录并执行定制脚本
       - name: 合并定制配置到LEDE源码
         run: |
           cp -r diy_resource/lede/* lede/
@@ -53,27 +53,37 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 关键修复：删除手动cp配置，脚本执行后直接生成默认配置，无需手动复制
-      - name: 生成机型默认配置
+      # 7. 生成机型默认配置
+      - name: 生成默认编译配置
         run: |
           cd lede
           make defconfig
+          # 打印当前选中的目标平台，确认是否为ipq60xx
+          grep CONFIG_TARGET_BOARD .config
 
-      # 7. 预下载全部源码包
+      # 8. 预下载全部源码包
       - name: 预下载编译依赖源码
         run: cd lede && make download -j$(nproc)
 
-      # 8. 编译固件
+      # 9. 编译固件，增加V=s输出详细编译日志，方便排错
       - name: 编译OpenWrt固件
-        run: cd lede && make -j$(nproc)
+        run: cd lede && make -j$(nproc) V=s
 
-      # 9. 清理下载缓存
+      # 新增：打印所有bin目录，确认固件实际输出路径
+      - name: 查看编译输出目录
+        run: |
+          cd lede
+          find bin -type f -name "*.img"
+          ls -la bin/targets/*/generic/
+
+      # 10. 清理下载缓存
       - name: 清理dl缓存节省空间
         run: cd lede && rm -rf dl
 
-      # 10. 上传刷机成品固件
+      # 11. 上传成品固件：路径改为全局匹配所有img文件，兜底适配目录变化
       - name: 上传成品固件
         uses: actions/upload-artifact@v4
         with:
-          path: lede/bin/targets/ipq60xx/generic/*.img
+          path: lede/bin/**/*.img
           name: RE-CS02_79d246b_完整校准固件
+          if-no-files-found: warn
