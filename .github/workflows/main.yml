@@ -14,12 +14,12 @@ jobs:
           sudo apt autoremove -y && sudo apt clean && sudo rm -rf /var/lib/apt/lists/*
           df -h
 
-      # 2. 克隆完整coolsnowwolf/lede主源码
+      # 2. 克隆纯净coolsnowwolf/lede主源码
       - name: 克隆完整LEDE源码
         run: git clone https://github.com/coolsnowwolf/lede.git lede
 
-      # 3. 拉取79d246b固定commit配置，开启LFS拉射频校准文件
-      - name: 拉取固定commit定制资源
+      # 3. 拉取79d246b固定commit定制资源，开启LFS获取射频校准board-2.bin
+      - name: 拉取固定commit配置文件
         uses: actions/checkout@v4
         with:
           repository: fanling1970/jdcloud_re-cs-02
@@ -27,42 +27,38 @@ jobs:
           path: diy_resource
           lfs: true
 
-      # 打印目录排查文件结构
-      - name: 打印DIY资源目录
-        run: ls -la diy_resource/ diy_resource/lede/
-
-      # 4. 复制脚本到lede源码根目录并执行定制脚本
-      - name: 合并定制配置到LEDE源码
+      # 4. 仅复制DIY脚本，**不执行diy-part（避免自动添加small冲突插件源）**
+      - name: 复制定制脚本，不执行DIY插件注入
         run: |
-          cp -r diy_resource/lede/* lede/
+          cp -r diy_resource/lede/diy-part*.sh lede/
           cd lede
           chmod +x diy-part1.sh diy-part2.sh
-          ./diy-part1.sh
-          ./diy-part2.sh
 
-      # 5. 安装全套编译依赖
-      - name: 安装编译环境依赖
+      # 5. 安装编译依赖
+      - name: 安装全套编译依赖
         run: |
           sudo apt update
           sudo apt install -y build-essential libncurses-dev gawk flex bison quilt libssl-dev libelf-dev zlib1g-dev git wget curl unzip python3 python3-distutils rsync file ccache
 
-      # =========核心1：注释small插件源，彻底屏蔽fchomo、dae系列插件下载==========
-      - name: 屏蔽冲突插件源，禁止下载fchomo/dae
+      # 6. 原生feeds仅保留核心官方源，彻底移除small冲突插件源
+      - name: 重置feeds为纯净官方源，屏蔽small插件
         run: |
           cd lede
-          # 注释feeds.conf.default里small插件源，fchomo就在small仓库
-          sed -i '/small.git/s/^/#/' feeds.conf.default
+          echo "src-git packages https://github.com/coolsnowwolf/packages" > feeds.conf.default
+          echo "src-git luci https://github.com/coolsnowwolf/luci" >> feeds.conf.default
+          echo "src-git routing https://github.com/coolsnowwolf/routing" >> feeds.conf.default
+          echo "src-git telephony https://github.com/coolsnowwolf/telephony" >> feeds.conf.default
           cat feeds.conf.default
 
-      # =========核心2：更新&安装feeds，此时不会下载冲突插件==========
-      - name: 更新并安装feeds（无fchomo/dae）
+      # 7. 更新安装纯净feeds（无small仓库，不存在fchomo/dae插件）
+      - name: 更新纯净插件源
         run: |
           cd lede
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 逐行写入ipq60xx雅典娜机型配置
-      - name: 强制写入京东云ipq60xx硬件平台配置
+      # 8. 强制写入京东云RE-CS-02 ipq60xx完整硬件配置
+      - name: 锁定ipq60xx雅典娜机型配置
         run: |
           cd lede
           echo 'CONFIG_TARGET_ipq60xx=y' > .config
@@ -70,34 +66,39 @@ jobs:
           echo 'CONFIG_TARGET_PROFILE="JDCloud RE-CS-02"' >> .config
           echo 'CONFIG_TARGET_BOARD="ipq60xx"' >> .config
           echo 'CONFIG_TARGET_SUBTARGET="generic"' >> .config
+          echo '# 禁用所有冲突插件' >> .config
+          echo 'CONFIG_PACKAGE_luci-app-fchomo=n' >> .config
+          echo 'CONFIG_PACKAGE_luci-app-dae=n' >> .config
+          echo 'CONFIG_PACKAGE_luci-app-daed=n' >> .config
+          echo 'CONFIG_PACKAGE_luci-app-daede=n' >> .config
 
-      # 刷新配置，无冲突插件，不会报错中断
-      - name: 刷新配置并校验目标平台
+      # 9. 同步基础配置，此时无small插件，不会报递归依赖错误
+      - name: 同步基础配置并校验平台
         run: |
           cd lede
           make defconfig
           grep CONFIG_TARGET_BOARD .config
 
-      # 预下载全部源码包
-      - name: 预下载编译依赖源码
+      # 10. 预下载编译依赖包
+      - name: 预下载源码包
         run: cd lede && make download -j$(nproc)
 
-      # 编译固件，完整日志排错
+      # 11. 完整日志编译固件
       - name: 编译OpenWrt固件
         run: cd lede && make -j$(nproc) V=s
 
-      # 检索生成的固件文件
-      - name: 检索所有img固件
+      # 12. 检索固件输出路径
+      - name: 查找生成的img固件
         run: |
           cd lede
           find bin -type f -name "*.img"
           ls -la bin/targets/ipq60xx/generic/
 
-      # 清理下载缓存释放磁盘
-      - name: 清理dl缓存目录
+      # 13. 清理缓存释放磁盘
+      - name: 清理dl下载缓存
         run: cd lede && rm -rf dl
 
-      # 全局递归上传全部img固件
+      # 14. 递归上传全部固件
       - name: 上传成品刷机固件
         uses: actions/upload-artifact@v4
         with:
