@@ -46,22 +46,22 @@ jobs:
           sudo apt update
           sudo apt install -y build-essential libncurses-dev gawk flex bison quilt libssl-dev libelf-dev zlib1g-dev git wget curl unzip python3 python3-distutils rsync file ccache
 
-      # ========== 顺序修正：先删冲突插件，再更新安装feeds ==========
-      - name: 彻底删除所有冲突插件源码（fchomo/dae/daed/daede全套）
+      # =========核心1：注释small插件源，彻底屏蔽fchomo、dae系列插件下载==========
+      - name: 屏蔽冲突插件源，禁止下载fchomo/dae
         run: |
           cd lede
-          rm -rf package/feeds/luci/luci-app-fchomo
-          rm -rf package/small/dae package/small/daed package/small/luci-app-daede
-          rm -rf package/feeds/luci/luci-app-dae package/feeds/luci/luci-app-daed
+          # 注释feeds.conf.default里small插件源，fchomo就在small仓库
+          sed -i '/small.git/s/^/#/' feeds.conf.default
+          cat feeds.conf.default
 
-      # 6. 更新&安装feeds（此时冲突插件已物理删除，不会复原）
-      - name: 更新并安装feeds
+      # =========核心2：更新&安装feeds，此时不会下载冲突插件==========
+      - name: 更新并安装feeds（无fchomo/dae）
         run: |
           cd lede
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 逐行写入ipq60xx机型配置，无YAML EOF语法错误
+      # 逐行写入ipq60xx雅典娜机型配置
       - name: 强制写入京东云ipq60xx硬件平台配置
         run: |
           cd lede
@@ -71,7 +71,7 @@ jobs:
           echo 'CONFIG_TARGET_BOARD="ipq60xx"' >> .config
           echo 'CONFIG_TARGET_SUBTARGET="generic"' >> .config
 
-      # 刷新配置，无冲突插件不会中断
+      # 刷新配置，无冲突插件，不会报错中断
       - name: 刷新配置并校验目标平台
         run: |
           cd lede
@@ -82,7 +82,7 @@ jobs:
       - name: 预下载编译依赖源码
         run: cd lede && make download -j$(nproc)
 
-      # 编译固件，完整日志方便排错
+      # 编译固件，完整日志排错
       - name: 编译OpenWrt固件
         run: cd lede && make -j$(nproc) V=s
 
