@@ -53,34 +53,51 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 7. 生成机型默认配置
-      - name: 生成默认编译配置
+      # ==========关键修复步骤，调整执行顺序==========
+      - name: 第一步：直接删除冲突插件源码，彻底消除依赖报错
+        run: |
+          cd lede
+          rm -rf package/feeds/luci/luci-app-fchomo
+          rm -rf package/small/dae package/small/daed
+          rm -rf package/feeds/luci/luci-app-dae package/feeds/luci/luci-app-daed
+
+      - name: 第二步：强制写入ipq60xx雅典娜机型配置
+        run: |
+          cd lede
+          cat > .config <<EOF
+CONFIG_TARGET_ipq60xx=y
+CONFIG_TARGET_ipq60xx_GENERIC=y
+CONFIG_TARGET_PROFILE="JDCloud RE-CS-02"
+CONFIG_TARGET_BOARD="ipq60xx"
+CONFIG_TARGET_SUBTARGET="generic"
+EOF
+
+      - name: 第三步：刷新配置，此时无冲突插件不会报错
         run: |
           cd lede
           make defconfig
-          # 打印当前选中的目标平台，确认是否为ipq60xx
           grep CONFIG_TARGET_BOARD .config
 
       # 8. 预下载全部源码包
       - name: 预下载编译依赖源码
         run: cd lede && make download -j$(nproc)
 
-      # 9. 编译固件，增加V=s输出详细编译日志，方便排错
+      # 9. 编译固件，开启完整日志排错
       - name: 编译OpenWrt固件
         run: cd lede && make -j$(nproc) V=s
 
-      # 新增：打印所有bin目录，确认固件实际输出路径
-      - name: 查看编译输出目录
+      # 查看编译输出目录
+      - name: 查看所有生成固件
         run: |
           cd lede
           find bin -type f -name "*.img"
-          ls -la bin/targets/*/generic/
+          ls -la bin/targets/ipq60xx/generic/
 
-      # 10. 清理下载缓存
+      # 清理下载缓存
       - name: 清理dl缓存节省空间
         run: cd lede && rm -rf dl
 
-      # 11. 上传成品固件：路径改为全局匹配所有img文件，兜底适配目录变化
+      # 递归匹配所有img固件上传
       - name: 上传成品固件
         uses: actions/upload-artifact@v4
         with:
