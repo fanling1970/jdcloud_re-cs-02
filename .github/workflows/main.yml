@@ -53,52 +53,52 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # ==========关键修复步骤，调整执行顺序==========
-      - name: 第一步：直接删除冲突插件源码，彻底消除依赖报错
+      # 第一步：物理删除冲突插件，根除依赖报错
+      - name: 删除冲突插件源码
         run: |
           cd lede
           rm -rf package/feeds/luci/luci-app-fchomo
           rm -rf package/small/dae package/small/daed
           rm -rf package/feeds/luci/luci-app-dae package/feeds/luci/luci-app-daed
 
-      - name: 第二步：强制写入ipq60xx雅典娜机型配置
+      # 第二步：分多行echo写入目标机型配置，抛弃EOF语法，兼容YAML
+      - name: 强制写入ipq60xx雅典娜机型配置
         run: |
           cd lede
-          cat > .config <<EOF
-CONFIG_TARGET_ipq60xx=y
-CONFIG_TARGET_ipq60xx_GENERIC=y
-CONFIG_TARGET_PROFILE="JDCloud RE-CS-02"
-CONFIG_TARGET_BOARD="ipq60xx"
-CONFIG_TARGET_SUBTARGET="generic"
-EOF
+          echo 'CONFIG_TARGET_ipq60xx=y' > .config
+          echo 'CONFIG_TARGET_ipq60xx_GENERIC=y' >> .config
+          echo 'CONFIG_TARGET_PROFILE="JDCloud RE-CS-02"' >> .config
+          echo 'CONFIG_TARGET_BOARD="ipq60xx"' >> .config
+          echo 'CONFIG_TARGET_SUBTARGET="generic"' >> .config
 
-      - name: 第三步：刷新配置，此时无冲突插件不会报错
+      # 第三步：刷新配置校验平台
+      - name: 刷新配置并打印平台
         run: |
           cd lede
           make defconfig
           grep CONFIG_TARGET_BOARD .config
 
-      # 8. 预下载全部源码包
+      # 预下载源码包
       - name: 预下载编译依赖源码
         run: cd lede && make download -j$(nproc)
 
-      # 9. 编译固件，开启完整日志排错
+      # 编译固件，完整日志排错
       - name: 编译OpenWrt固件
         run: cd lede && make -j$(nproc) V=s
 
-      # 查看编译输出目录
-      - name: 查看所有生成固件
+      # 查看固件输出目录
+      - name: 查看生成的img固件
         run: |
           cd lede
           find bin -type f -name "*.img"
           ls -la bin/targets/ipq60xx/generic/
 
-      # 清理下载缓存
-      - name: 清理dl缓存节省空间
+      # 清理缓存
+      - name: 清理dl下载缓存
         run: cd lede && rm -rf dl
 
-      # 递归匹配所有img固件上传
-      - name: 上传成品固件
+      # 递归上传所有img固件
+      - name: 上传成品刷机固件
         uses: actions/upload-artifact@v4
         with:
           path: lede/bin/**/*.img
