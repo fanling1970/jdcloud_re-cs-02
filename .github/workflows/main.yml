@@ -18,7 +18,7 @@ jobs:
       - name: 克隆完整LEDE源码
         run: git clone https://github.com/coolsnowwolf/lede.git lede
 
-      # 3. 拉取79d246b固定commit配置，开启LFS
+      # 3. 拉取79d246b固定commit配置，开启LFS拉取射频校准文件
       - name: 拉取固定commit定制资源
         uses: actions/checkout@v4
         with:
@@ -27,15 +27,14 @@ jobs:
           path: diy_resource
           lfs: true
 
-      # 新增：打印目录排查文件位置
-      - name: 打印DIY资源目录结构
-        run: ls -la diy_resource/
+      # 打印目录确认文件结构（方便排错）
+      - name: 打印DIY资源目录
+        run: ls -la diy_resource/ diy_resource/lede/
 
-      # 4. 复制所有定制文件到lede
+      # 4. 正确复制：把 diy_resource/lede/ 内部所有文件直接覆盖到lede源码根目录
       - name: 合并定制配置到LEDE源码
         run: |
-          # 复制顶层所有文件（sh脚本、conf）
-          cp -r diy_resource/* lede/
+          cp -r diy_resource/lede/* lede/
           cd lede
           chmod +x diy-part1.sh diy-part2.sh
           ./diy-part1.sh
@@ -47,39 +46,35 @@ jobs:
           sudo apt update
           sudo apt install -y build-essential libncurses-dev gawk flex bison quilt libssl-dev libelf-dev zlib1g-dev git wget curl unzip python3 python3-distutils rsync file ccache
 
-      # 6. 更新feeds
-      - name: 更新并安装feeds软件源
+      # 6. 更新feeds软件源
+      - name: 更新并安装feeds
         run: |
           cd lede
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 修正：先确认config目录存在，再复制配置
-      - name: 载入京东云雅典娜机型配置
+      # 7. 加载机型配置，全局查找re-cs-02.config
+      - name: 载入雅典娜机型配置
         run: |
           cd lede
-          ls -la
-          # 如果config文件夹不存在则自动创建
-          mkdir -p config
-          # 查找配置文件并复制
           find . -name "re-cs-02.config"
           cp $(find . -name "re-cs-02.config") .config
           make defconfig
 
-      # 7. 预下载源码包
+      # 8. 预下载源码包
       - name: 预下载编译依赖源码
         run: cd lede && make download -j$(nproc)
 
-      # 8. 编译固件
+      # 9. 编译固件
       - name: 编译OpenWrt固件
         run: cd lede && make -j$(nproc)
 
-      # 9. 清理缓存
-      - name: 清理dl下载缓存
+      # 10. 清理下载缓存
+      - name: 清理dl缓存节省空间
         run: cd lede && rm -rf dl
 
-      # 10. 上传固件
-      - name: 上传成品刷机固件
+      # 11. 上传刷机固件
+      - name: 上传成品固件
         uses: actions/upload-artifact@v4
         with:
           path: lede/bin/targets/ipq60xx/generic/*.img
