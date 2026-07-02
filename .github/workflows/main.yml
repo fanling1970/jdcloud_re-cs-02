@@ -14,37 +14,46 @@ jobs:
           sudo apt autoremove -y && sudo apt clean && sudo rm -rf /var/lib/apt/lists/*
           df -h
 
-      # 关键两点：ref锁定79d246b；lfs: true拉取完整board-2.bin校准文件
-      - name: 拉取指定commit源码+下载LFS射频校准文件
+      # 拉取指定commit源码+下载LFS射频校准文件
+      - name: 拉取源码
         uses: actions/checkout@v4
         with:
           ref: 79d246b6d0336bd5352ecb878236e2e8fe31c009
           fetch-depth: 0
-          lfs: true # 缺少此行，必然无网络
+          lfs: true
 
       - name: 安装全套编译依赖
         run: |
           sudo apt update
           sudo apt install -y build-essential libncurses-dev gawk flex bison quilt libssl-dev libelf-dev zlib1g-dev git wget curl unzip python3 python3-distutils rsync file ccache
 
+      # 关键修复：先cd到源码根目录再执行feeds命令
       - name: 更新并安装feeds插件源
         run: |
+          cd $GITHUB_WORKSPACE
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: 加载RE-CS-02原厂机型配置
         run: |
+          cd $GITHUB_WORKSPACE
           cp config/re-cs-02.config .config
           make defconfig
 
-      - name: 预下载所有源码包，减少编译报错
-        run: make download -j$(nproc)
+      - name: 预下载所有源码包
+        run: |
+          cd $GITHUB_WORKSPACE
+          make download -j$(nproc)
 
       - name: 编译固件
-        run: make -j$(nproc)
+        run: |
+          cd $GITHUB_WORKSPACE
+          make -j$(nproc)
 
-      - name: 清理dl下载目录，释放空间
-        run: rm -rf dl
+      - name: 清理dl下载目录
+        run: |
+          cd $GITHUB_WORKSPACE
+          rm -rf dl
 
       - name: 上传编译完成的img固件
         uses: actions/upload-artifact@v4
